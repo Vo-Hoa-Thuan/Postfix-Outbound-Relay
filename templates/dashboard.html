@@ -60,6 +60,14 @@
 
 </div>
 
+<!-- ── Analytics Chart ────────────────────────────────────────────────── -->
+<div class="section-header">
+    <h2 data-i18n="lbl_analytics_24h">Sending Activity (Last 24 Hours)</h2>
+</div>
+<div class="card">
+    <canvas id="activityChart" style="width:100%; height:300px;"></canvas>
+</div>
+
 <!-- ── Per-IP Counters ──────────────────────────────────────────────── -->
 {% if counters %}
 <div class="section-header">
@@ -158,5 +166,64 @@
     // Call fetch immediately and then every 1 second
     updateDashboard();
     setInterval(updateDashboard, 1000);
+</script>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const ctx = document.getElementById('activityChart').getContext('2d');
+        let chartInstance = null;
+
+        fetch('/api/chart')
+            .then(res => res.json())
+            .then(data => {
+                chartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.labels,
+                        datasets: [
+                            {
+                                label: 'Sent',
+                                data: data.datasets.sent,
+                                borderColor: 'rgb(75, 192, 192)',
+                                backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                                tension: 0.3,
+                                fill: true
+                            },
+                            {
+                                label: 'Deferred',
+                                data: data.datasets.deferred,
+                                borderColor: 'rgb(255, 159, 64)',
+                                backgroundColor: 'transparent',
+                                tension: 0.3,
+                                borderDash: [5, 5]
+                            },
+                            {
+                                label: 'Bounced',
+                                data: data.datasets.bounced,
+                                borderColor: 'rgb(255, 99, 132)',
+                                backgroundColor: 'transparent',
+                                tension: 0.3
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            })
+            .catch(err => console.error("Error loading chart data:", err));
+    });
 </script>
 {% endblock %}

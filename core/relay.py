@@ -104,13 +104,50 @@ def _reset_stale_counter(counters: Dict, ip: str) -> Dict:
     return counters
 
 
+def get_effective_limit(ip_cfg: dict) -> int:
+    """Calculate the effective limit per hour.
+    If warmup is enabled, increase limit linearly each day from 50 until target limit."""
+    original_limit = ip_cfg.get("limit_per_hour", 0)
+    
+    if not ip_cfg.get("warmup_enabled", False) or original_limit <= 0:
+        return original_limit
+        
+    start_date_str = ip_cfg.get("warmup_start_date", "")
+    if not start_date_str:
+        return original_limit
+        
+    import datetime
+    try:
+        start_date = datetime.datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        today = datetime.date.today()
+        days_active = (today - start_date).days
+        
+        if days_active < 0:
+            return 0  # hasn't started yet
+            
+        # Hardcoded curve: 50 -> 100 -> 300 -> 500 -> 1000 -> Target over 14 days
+        # To make it simple, let's just do a linear increase over 14 days:
+        # Base starts at 50 on Day 0. Every day adds (Target-50)/14
+        base_amount = 50
+        if days_active >= 14:
+            return original_limit
+            
+        increment = (original_limit - base_amount) / 14.0
+        calculated = int(base_amount + (increment * days_active))
+        return min(calculated, original_limit)
+        
+    except ValueError:
+        return original_limit
+
+
 def check_limit(ip: str) -> bool:
     """Return True if IP is under its hourly send limit (or no limit set)."""
     config = read_json(CONFIG_IPS, {"ips": []})
     ip_cfg = next((x for x in config.get("ips", []) if x["ip"] == ip), None)
     if not ip_cfg:
         return True
-    limit = ip_cfg.get("limit_per_hour", 0)
+    
+    limit = get_effective_limit(ip_cfg)
     if limit <= 0:
         return True  # no limit
 

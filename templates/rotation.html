@@ -17,6 +17,8 @@
                 <label data-i18n="lbl_rot_interval">Rotation Interval</label>
                 <div class="preset-btns">
                     <button type="button" class="btn btn-xs btn-secondary"
+                        onclick="setRotationInterval(10)">10s</button>
+                    <button type="button" class="btn btn-xs btn-secondary"
                         onclick="setRotationInterval(30)">30s</button>
                     <button type="button" class="btn btn-xs btn-secondary" onclick="setRotationInterval(60)">1m</button>
                     <button type="button" class="btn btn-xs btn-secondary"
@@ -28,6 +30,7 @@
                     <button type="button" class="btn btn-xs btn-secondary"
                         onclick="setRotationInterval(3600)">1h</button>
                 </div>
+                <small class="muted" style="display:block; margin-top:5px;">Tip: Setting interval to 10s-30s simulates Load Balancing across multiple IPs.</small>
                 <div class="input-suffix">
                     <input type="number" name="rotation_seconds" id="rotSecs" value="{{ rotation_secs }}" min="10"
                         class="form-input" />

@@ -35,11 +35,16 @@ def _get_active_ip() -> Optional[str]:
 
 @router.get("", response_class=HTMLResponse)
 async def list_ips(request: Request, msg: str = "", error: str = ""):
+    from core.relay import get_effective_limit
     data      = _read_ips()
     active_ip = _get_active_ip()
+    ips_list = data.get("ips", [])
+    for ip_cfg in ips_list:
+        ip_cfg["effective_limit"] = get_effective_limit(ip_cfg)
+        
     return templates.TemplateResponse("ips.html", {
         "request":   request,
-        "ips":       data.get("ips", []),
+        "ips":       ips_list,
         "active_ip": active_ip,
         "msg":       msg,
         "error":     error,
@@ -56,6 +61,8 @@ async def add_ip(
     smtp_user:      str = Form(""),
     smtp_pass:      str = Form(""),
     enabled:        Optional[str] = Form(None),
+    warmup_enabled: Optional[str] = Form(None),
+    warmup_start_date: str = Form(""),
 ):
     data = _read_ips()
     ips  = data.get("ips", [])
@@ -72,6 +79,8 @@ async def add_ip(
         "note":           note,
         "smtp_user":      smtp_user,
         "smtp_pass":      smtp_pass,
+        "warmup_enabled": warmup_enabled == "on",
+        "warmup_start_date": warmup_start_date,
     })
     data["ips"] = ips
     _write_ips(data)
@@ -88,6 +97,8 @@ async def edit_ip(
     smtp_user:      str  = Form(""),
     smtp_pass:      str  = Form(""),
     enabled:        Optional[str] = Form(None),
+    warmup_enabled: Optional[str] = Form(None),
+    warmup_start_date: str = Form(""),
 ):
     data = _read_ips()
     ips  = data.get("ips", [])
@@ -99,6 +110,8 @@ async def edit_ip(
             entry["smtp_user"]      = smtp_user
             entry["smtp_pass"]      = smtp_pass
             entry["enabled"]        = enabled == "on"
+            entry["warmup_enabled"] = warmup_enabled == "on"
+            entry["warmup_start_date"] = warmup_start_date
             break
     data["ips"] = ips
     _write_ips(data)
@@ -126,3 +139,17 @@ async def toggle_ip(ip: str = Form(...)):
             break
     _write_ips(data)
     return RedirectResponse("/ips?msg=IP+status+updated", status_code=303)
+
+
+@router.post("/check-blacklist")
+async def check_ip_blacklist_route(ip: str = Form(...)):
+    from core.blacklist import check_ip_blacklist, process_ip_blacklist_alert
+    
+    # First, simply check without triggering the alert if doing manual check
+    # Wait, process_ip_blacklist_alert does the heavy lifting of disabling and alerting. Let's just use it so manual check behaves same as auto check.
+    is_bad = process_ip_blacklist_alert(ip)
+    
+    if is_bad:
+        return RedirectResponse(f"/ips?error=WARNING:+{ip}+is+BLACKLISTED!+It+has+been+automatically+disabled.", status_code=303)
+    else:
+        return RedirectResponse(f"/ips?msg={ip}+is+clean+(Not+blacklisted).", status_code=303)

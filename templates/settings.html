@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% set active_page = "settings" %}
+
+{% block title %}Settings – Postfix Relay Panel{% endblock %}
+{% block page_title %}System Settings{% endblock %}
+
+{% block content %}
+<div class="card form-card">
+    <h2 class="card-title">Panel Settings</h2>
+    <form action="/settings/save" method="post" class="form-grid">
+        <div class="section-header" style="grid-column: 1 / -1; margin-top: 10px;">
+            <h3>MXToolbox Integration</h3>
+        </div>
+        
+        <div class="form-group" style="grid-column: 1 / -1;">
+            <label>API Key</label>
+            <input type="text" name="mxtoolbox_api_key" value="{{ settings.mxtoolbox_api_key }}" placeholder="Enter MXToolbox API Key" class="form-input" />
+            <small class="muted">Used for automatic IP Blacklist checking.</small>
+        </div>
+
+        <div class="section-header" style="grid-column: 1 / -1; margin-top: 20px;">
+            <h3>Email Alerting (SMTP)</h3>
+        </div>
+
+        <div class="form-group form-check-group" style="grid-column: 1 / -1;">
+            <label class="toggle-label">
+                <input type="checkbox" name="alert_enabled" value="on" {% if settings.alert_email.enabled %}checked{% endif %} class="toggle-input" />
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                <span>Enable Email Alerts</span>
+            </label>
+        </div>
+
+        <div class="form-group">
+            <label>SMTP Host</label>
+            <input type="text" name="smtp_host" value="{{ settings.alert_email.smtp_host }}" class="form-input" />
+        </div>
+        
+        <div class="form-group">
+            <label>SMTP Port</label>
+            <input type="number" name="smtp_port" value="{{ settings.alert_email.smtp_port }}" class="form-input" />
+        </div>
+
+        <div class="form-group">
+            <label>SMTP User (optional)</label>
+            <input type="text" name="smtp_user" value="{{ settings.alert_email.smtp_user }}" class="form-input" />
+        </div>
+        
+        <div class="form-group">
+            <label>SMTP Pass (optional)</label>
+            <input type="password" name="smtp_pass" value="{{ settings.alert_email.smtp_pass }}" class="form-input" />
+        </div>
+
+        <div class="form-group">
+            <label>From Email</label>
+            <input type="email" name="from_email" value="{{ settings.alert_email.from_email }}" class="form-input" />
+        </div>
+        
+        <div class="form-group">
+            <label>To Email</label>
+            <input type="email" name="to_email" value="{{ settings.alert_email.to_email }}" class="form-input" />
+        </div>
+
+        <div class="form-actions" style="grid-column: 1 / -1; justify-content: flex-start; gap: 10px;">
+            <button type="submit" class="btn btn-primary">Save Settings</button>
+        </div>
+    </form>
+    
+    <hr style="margin: 20px 0; border: 0; border-top: 1px solid var(--border);" />
+    
+    <div style="grid-column: 1 / -1;">
+        <h3>Test Alerts</h3>
+        <p class="muted">Send a test notification using the saved configurations.</p>
+        <form action="/settings/test-email" method="post" style="margin-top: 10px;">
+            <button type="submit" class="btn btn-secondary">Send Test Email</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

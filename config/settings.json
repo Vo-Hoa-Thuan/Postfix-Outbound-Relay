@@ -1,0 +1,12 @@
+{
+  "mxtoolbox_api_key": "cd9bfde0-fd2f-4790-a0a2-98c781ccc173",
+  "alert_email": {
+    "enabled": false,
+    "smtp_host": "127.0.0.1",
+    "smtp_port": 25,
+    "smtp_user": "",
+    "smtp_pass": "",
+    "from_email": "alerts@postfix-panel.local",
+    "to_email": "vohoathuan.devt@gmail.com"
+  }
+}

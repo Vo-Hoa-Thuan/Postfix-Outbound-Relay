@@ -33,12 +33,14 @@ from web.routes.ips       import router as ips_router
 from web.routes.rotation  import router as rotation_router
 from web.routes.rspamd    import router as rspamd_router
 from web.routes.logs      import router as logs_router
+from web.routes.settings  import router as settings_router
 
 app.include_router(dashboard_router)
 app.include_router(ips_router)
 app.include_router(rotation_router)
 app.include_router(rspamd_router)
 app.include_router(logs_router)
+app.include_router(settings_router)
 
 
 import asyncio
@@ -46,6 +48,8 @@ import asyncio
 async def _rotation_loop():
     from core.rotation import rotate_if_needed
     from core.postfix import sync_transport
+    from core.blacklist import auto_check_all
+    
     print("[RelayPanel] Started background IP rotation loop.")
     while True:
         try:
@@ -53,6 +57,10 @@ async def _rotation_loop():
             if rotated and new_ip:
                 print(f"[RelayPanel] Auto-rotated to IP: {new_ip}")
                 sync_transport(new_ip)
+                
+            # Periodic background checks (the function itself throttles to 12h)
+            auto_check_all()
+            
         except Exception as e:
             print(f"[RelayPanel] Rotation loop error: {e}")
         await asyncio.sleep(5)

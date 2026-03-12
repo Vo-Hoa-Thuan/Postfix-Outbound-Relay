@@ -94,3 +94,67 @@ def _count_deferred_this_hour() -> int:
     except Exception:
         pass
     return count
+
+@router.get("/api/chart")
+async def api_chart():
+    import json
+    from datetime import datetime, timedelta
+    
+    parsed_log = os.path.join(BASE_DIR, "logs", "parsed.log")
+    
+    # Initialize the last 24 hours with 0
+    now = datetime.now()
+    hours_labels = []
+    chart_data = {"sent": {}, "deferred": {}, "bounced": {}}
+    
+    # Create x-axis labels for the last 24 hours (including current hour)
+    for i in range(23, -1, -1):
+        h_time = now - timedelta(hours=i)
+        label = h_time.strftime("%H:00")
+        prefix = h_time.strftime("%Y-%m-%d %H") # Key for matching log time
+        hours_labels.append({"label": label, "prefix": prefix})
+        
+        chart_data["sent"][prefix] = 0
+        chart_data["deferred"][prefix] = 0
+        chart_data["bounced"][prefix] = 0
+        
+    oldest_prefix = hours_labels[0]["prefix"]
+    
+    if os.path.exists(parsed_log):
+        try:
+            with open(parsed_log, "r", encoding="utf-8") as f:
+                # To avoid reading massive files, we could read lines from bottom up, 
+                # but standard python reading top-down is fine for small/medium logs.
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = json.loads(line)
+                        log_time = entry.get("time", "")
+                        status = entry.get("status", "")
+                        
+                        # Match the YYYY-MM-DD HH prefix
+                        if len(log_time) >= 13:
+                            prefix = log_time[:13]
+                            if prefix >= oldest_prefix and prefix in chart_data[status]:
+                                chart_data[status][prefix] += 1
+                                
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+            
+    # Format into arrays matching the labels
+    sent_arr = [chart_data["sent"][h["prefix"]] for h in hours_labels]
+    deferred_arr = [chart_data["deferred"][h["prefix"]] for h in hours_labels]
+    bounced_arr = [chart_data["bounced"][h["prefix"]] for h in hours_labels]
+    
+    return {
+        "labels": [h["label"] for h in hours_labels],
+        "datasets": {
+            "sent": sent_arr,
+            "deferred": deferred_arr,
+            "bounced": bounced_arr
+        }
+    }
