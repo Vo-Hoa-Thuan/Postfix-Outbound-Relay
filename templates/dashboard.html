@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% set active_page = "dashboard" %}
+
+{% block title %}Dashboard – Postfix Relay Panel{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- ── Status Cards ─────────────────────────────────────────────────── -->
+<div class="cards-grid">
+
+    <div class="card stat-card">
+        <div class="stat-label" data-i18n="lbl_postfix">Postfix</div>
+        <div class="stat-value">
+            <span class="badge badge-{% if postfix_status == 'running' %}green{% else %}red{% endif %}">
+                {{ postfix_status | upper }}
+            </span>
+        </div>
+        <div class="stat-icon">📮</div>
+    </div>
+
+    <div class="card stat-card">
+        <div class="stat-label" data-i18n="lbl_rspamd">Rspamd</div>
+        <div class="stat-value">
+            <span class="badge badge-{% if rspamd_status == 'running' %}green{% else %}red{% endif %}">
+                {{ rspamd_status | upper }}
+            </span>
+        </div>
+        <div class="stat-icon">🛡</div>
+    </div>
+
+    <div class="card stat-card">
+        <div class="stat-label" data-i18n="lbl_active_ip">Active IP</div>
+        <div class="stat-value mono">{{ active_ip }}</div>
+        <div class="stat-sub">
+            {% if active_ip_cfg %}
+            Weight {{ active_ip_cfg.weight }} · Limit {{ active_ip_cfg.limit_per_hour }}/hr
+            {% endif %}
+        </div>
+        <div class="stat-icon">🔗</div>
+    </div>
+
+    <div class="card stat-card">
+        <div class="stat-label" data-i18n="lbl_next_rot">Next Rotation</div>
+        <div class="stat-value" id="countdown" data-remaining="{{ time_remaining }}">{{ time_remaining }}s</div>
+        <div class="stat-sub">Mode: {{ rotation_mode }} · Interval: {{ rotation_secs }}s</div>
+        <div class="stat-icon">↻</div>
+    </div>
+
+    <div class="card stat-card">
+        <div class="stat-label" data-i18n="lbl_sent_h">Sent (this hour)</div>
+        <div class="stat-value">{{ total_sent }}</div>
+        <div class="stat-icon">📤</div>
+    </div>
+
+    <div class="card stat-card">
+        <div class="stat-label" data-i18n="lbl_deferred_h">Deferred (this hour)</div>
+        <div class="stat-value warn">{{ total_deferred }}</div>
+        <div class="stat-icon">⏳</div>
+    </div>
+
+</div>
+
+<!-- ── Per-IP Counters ──────────────────────────────────────────────── -->
+{% if counters %}
+<div class="section-header">
+    <h2 data-i18n="lbl_ip_counters">Per-IP Send Counters (Current Hour)</h2>
+</div>
+<div class="card">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th data-i18n="col_ip">IP Address</th>
+                <th data-i18n="col_sent_h">Sent This Hour</th>
+                <th data-i18n="col_window">Window Start</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ip, data in counters.items() %}
+            <tr>
+                <td class="mono">{{ ip }}</td>
+                <td><strong>{{ data.count }}</strong></td>
+                <td class="mono muted">{{ data.window }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state">
+    <p data-i18n="lbl_no_activity">No send activity recorded this hour.</p>
+</div>
+{% endif %}
+
+<!-- ── Quick Actions ────────────────────────────────────────────────── -->
+<div class="section-header">
+    <h2 data-i18n="lbl_quick_actions">Quick Actions</h2>
+</div>
+<div class="quick-actions">
+    <a href="/ips" class="btn btn-secondary" data-i18n="btn_manage_ips">Manage IPs</a>
+    <a href="/rotation" class="btn btn-secondary" data-i18n="btn_rotation_set">Rotation Settings</a>
+    <a href="/rspamd" class="btn btn-secondary" data-i18n="btn_rspamd_cfg">Rspamd Config</a>
+    <a href="/logs" class="btn btn-secondary" data-i18n="btn_view_logs">View SMTP Logs</a>
+    <form action="/rotation/trigger" method="post" style="display:inline">
+        <button type="submit" class="btn btn-accent" data-i18n="btn_force_rotate">⟳ Force IP Rotation Now</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const countdownEl = document.getElementById('countdown');
+    
+    function updateDashboard() {
+        fetch('/api/status')
+            .then(res => res.json())
+            .then(data => {
+                // Update countdown
+                countdownEl.textContent = data.time_remaining + 's';
+                
+                // Update active IP block
+                const statCards = document.querySelectorAll('.stat-card');
+                
+                // Update postfix badge
+                const postBadge = statCards[0].querySelector('.badge');
+                postBadge.className = 'badge badge-' + (data.postfix_status === 'running' ? 'green' : 'red');
+                postBadge.textContent = data.postfix_status.toUpperCase();
+                
+                // Update rspamd badge
+                const rspBadge = statCards[1].querySelector('.badge');
+                rspBadge.className = 'badge badge-' + (data.rspamd_status === 'running' ? 'green' : 'red');
+                rspBadge.textContent = data.rspamd_status.toUpperCase();
+                
+                // Update Active IP
+                statCards[2].querySelector('.stat-value').textContent = data.active_ip;
+                if (data.active_ip_cfg) {
+                    let subText = `Weight ${data.active_ip_cfg.weight} · Limit ${data.active_ip_cfg.limit_per_hour}/hr`;
+                    if (data.active_ip_cfg.smtp_user) {
+                        subText += ` · Auth: ${data.active_ip_cfg.smtp_user}`;
+                    }
+                    statCards[2].querySelector('.stat-sub').textContent = subText;
+                }
+                
+                // Update rotation mode/sec
+                statCards[3].querySelector('.stat-sub').textContent = `Mode: ${data.rotation_mode} · Interval: ${data.rotation_secs}s`;
+                
+                // Update counters
+                statCards[4].querySelector('.stat-value').textContent = data.total_sent;
+                statCards[5].querySelector('.stat-value').textContent = data.total_deferred;
+
+                if (data.time_remaining === 0) {
+                    countdownEl.textContent = 'Rotating...';
+                    // Optional: slow down poll temporarily or let it catch the new config on next tick
+                }
+            })
+            .catch(err => console.error("Error fetching status:", err));
+    }
+
+    // Call fetch immediately and then every 1 second
+    updateDashboard();
+    setInterval(updateDashboard, 1000);
+</script>
+{% endblock %}

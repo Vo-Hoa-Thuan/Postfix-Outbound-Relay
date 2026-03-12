@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% set active_page = "rspamd" %}
+
+{% block title %}Rspamd Config – Postfix Relay Panel{% endblock %}
+{% block page_title %}Rspamd Configuration{% endblock %}
+
+{% block content %}
+
+<div class="layout-2col">
+
+    <!-- ── Config Form ──────────────────────────────────────────────────── -->
+    <div class="card form-card">
+        <h2 class="card-title" data-i18n="ttl_filter_set">Filter Settings</h2>
+        <form action="/rspamd/save" method="post" class="form-stack">
+
+            <!-- Enable Rspamd -->
+            <div class="form-group form-check-group">
+                <label class="toggle-label">
+                    <input type="checkbox" name="enable" value="on" {% if cfg.get('enable', True) %}checked{% endif %}
+                        class="toggle-input" />
+                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                    <span data-i18n="lbl_enable_rsp"><strong>Enable Rspamd</strong> – Anti-spam filtering</span>
+                </label>
+            </div>
+
+            <!-- Required Score -->
+            <div class="form-group">
+                <label data-i18n="lbl_reject_score">Reject Score Threshold</label>
+                <div class="input-suffix">
+                    <input type="number" name="required_score" step="0.1" min="1" max="20"
+                        value="{{ cfg.get('required_score', 6.0) }}" class="form-input" />
+                    <span class="suffix-label" data-i18n="lbl_points">points</span>
+                </div>
+                <small class="help-text" data-i18n="lbl_score_help">Mail scoring above this minus 9 gets rejected.
+                    Greylist at threshold − 1.5.</small>
+            </div>
+
+            <!-- Greylist -->
+            <div class="form-group form-check-group">
+                <label class="toggle-label">
+                    <input type="checkbox" name="greylist" value="on" {% if cfg.get('greylist', True) %}checked{% endif
+                        %} class="toggle-input" />
+                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                    <span><strong data-i18n="lbl_greylist">Enable Greylisting</strong></span>
+                </label>
+            </div>
+
+            <hr class="divider" />
+
+            <!-- Rate Limit -->
+            <div class="form-group form-check-group">
+                <label class="toggle-label">
+                    <input type="checkbox" name="rl_enable" value="on" {% if cfg.get('rate_limit', {}).get('enable',
+                        True) %}checked{% endif %} class="toggle-input" />
+                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                    <span><strong data-i18n="lbl_rate_limit">Enable Rate Limiting</strong></span>
+                </label>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label data-i18n="lbl_burst">Burst</label>
+                    <input type="number" name="rl_burst" min="1"
+                        value="{{ cfg.get('rate_limit', {}).get('burst', 100) }}" class="form-input" />
+                </div>
+                <div class="form-group">
+                    <label data-i18n="lbl_rate">Rate</label>
+                    <input type="text" name="rl_rate" value="{{ cfg.get('rate_limit', {}).get('rate', '50 / 1min') }}"
+                        placeholder="e.g. 50 / 1min" class="form-input" />
+                </div>
+            </div>
+
+            <hr class="divider" />
+
+            <!-- Whitelist IPs -->
+            <div class="form-group">
+                <label data-i18n="lbl_whitelist_ip">Whitelist IPs <small>(one per line)</small></label>
+                <textarea name="whitelist_ips" rows="4" class="form-textarea"
+                    placeholder="192.168.1.0/24&#10;10.0.0.1">{{ cfg.get('whitelist_ips', []) | join('\n') }}</textarea>
+            </div>
+
+            <!-- Blacklist Domains -->
+            <div class="form-group">
+                <label data-i18n="lbl_blacklist_dm">Blacklist Domains <small>(one per line)</small></label>
+                <textarea name="blacklist_domains" rows="4" class="form-textarea"
+                    placeholder="spam.example.com&#10;phish.net">{{ cfg.get('blacklist_domains', []) | join('\n') }}</textarea>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" data-i18n="btn_save_reload">Save &amp; Reload
+                    Rspamd</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- ── Status Panel ─────────────────────────────────────────────────── -->
+    <div>
+        <div class="card stat-card-lg">
+            <div class="stat-label" data-i18n="ttl_rsp_service">Rspamd Service</div>
+            <div class="stat-value">
+                <span class="badge badge-{% if status == 'running' %}green{% else %}red{% endif %} badge-lg">
+                    {{ status | upper }}
+                </span>
+            </div>
+        </div>
+
+        <div class="card mt-2">
+            <h3 class="card-title" data-i18n="ttl_cfg_summary">Current Config Summary</h3>
+            <div class="info-list">
+                <div class="info-row">
+                    <span data-i18n="row_enabled">Enabled</span>
+                    <span class="badge badge-{% if cfg.get('enable') %}green{% else %}red{% endif %}">{{
+                        cfg.get('enable', True) }}</span>
+                </div>
+                <div class="info-row">
+                    <span data-i18n="row_req_score">Required Score</span>
+                    <span class="mono">{{ cfg.get('required_score', 6.0) }}</span>
+                </div>
+                <div class="info-row">
+                    <span data-i18n="row_greylist">Greylist</span>
+                    <span class="badge badge-{% if cfg.get('greylist') %}green{% else %}red{% endif %}">{{
+                        cfg.get('greylist', True) }}</span>
+                </div>
+                <div class="info-row">
+                    <span data-i18n="row_rate_limit">Rate Limit</span>
+                    <span class="mono">{{ cfg.get('rate_limit', {}).get('rate', '—') }}</span>
+                </div>
+                <div class="info-row">
+                    <span data-i18n="row_whitelist">Whitelist IPs</span>
+                    <span>{{ (cfg.get('whitelist_ips') or []) | length }}</span>
+                </div>
+                <div class="info-row">
+                    <span data-i18n="row_blacklist">Blacklist Domains</span>
+                    <span>{{ (cfg.get('blacklist_domains') or []) | length }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

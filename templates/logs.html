@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% set active_page = "logs" %}
+
+{% block title %}SMTP Monitor – Postfix Relay Panel{% endblock %}
+{% block page_title %}SMTP Monitor{% endblock %}
+
+{% block content %}
+
+<!-- ── Filter Bar ────────────────────────────────────────────────────── -->
+<div class="card filter-card">
+    <form method="get" action="/logs" class="filter-form">
+        <div class="filter-group">
+            <label data-i18n="lbl_local_ip">Local IP</label>
+            <select name="ip" class="form-input form-select">
+                <option value="" data-i18n="lbl_all_ips">All IPs</option>
+                {% for aip in all_ips %}
+                <option value="{{ aip }}" {% if f_ip==aip %}selected{% endif %}>{{ aip }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="filter-group">
+            <label data-i18n="lbl_sender">Sender</label>
+            <input type="text" name="sender" value="{{ f_sender }}" placeholder="from@example.com" class="form-input" />
+        </div>
+        <div class="filter-group">
+            <label data-i18n="lbl_recipient">Recipient</label>
+            <input type="text" name="recipient" value="{{ f_recipient }}" placeholder="to@domain.com"
+                class="form-input" />
+        </div>
+        <div class="filter-group">
+            <label data-i18n="lbl_date">Date</label>
+            <input type="date" name="date" value="{{ f_date }}" class="form-input" />
+        </div>
+        <div class="filter-group">
+            <label data-i18n="lbl_status">Status</label>
+            <select name="status" class="form-input form-select">
+                <option value="" data-i18n="lbl_all">All</option>
+                <option value="sent" {% if f_status=='sent' %}selected{% endif %}>Sent</option>
+                <option value="deferred" {% if f_status=='deferred' %}selected{% endif %}>Deferred</option>
+                <option value="bounced" {% if f_status=='bounced' %}selected{% endif %}>Bounced</option>
+            </select>
+        </div>
+        <div class="filter-actions">
+            <button type="submit" class="btn btn-primary" data-i18n="btn_filter">Filter</button>
+            <a href="/logs" class="btn btn-secondary" data-i18n="btn_reset">Reset</a>
+        </div>
+    </form>
+</div>
+
+<!-- ── Results header ────────────────────────────────────────────────── -->
+<div class="section-header">
+    <h2 data-i18n="ttl_mail_log">Mail Log</h2>
+    <span class="muted">{{ total }} entries · Page {{ page }} / {{ total_pages }}</span>
+</div>
+
+<!-- ── Log Table ─────────────────────────────────────────────────────── -->
+{% if entries %}
+<div class="card table-card">
+    <table class="data-table log-table">
+        <thead>
+            <tr>
+                <th data-i18n="col_time">Time</th>
+                <th data-i18n="col_from">From</th>
+                <th data-i18n="col_to">To</th>
+                <th data-i18n="col_subject">Subject</th>
+                <th data-i18n="col_dest_ip">Dest IP</th>
+                <th data-i18n="col_local_ip">Local IP</th>
+                <th data-i18n="lbl_status">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for e in entries %}
+            <tr class="log-row log-{{ e.status }}">
+                <td class="mono nowrap">{{ e.time }}</td>
+                <td class="mono">{{ e.from }}</td>
+                <td class="mono">{{ e.to }}</td>
+                <td class="ellipsis" title="{{ e.subject }}">{{ e.subject or "—" }}</td>
+                <td class="mono">{{ e.dest_ip }}</td>
+                <td class="mono">{{ e.local_ip or "—" }}</td>
+                <td>
+                    <span
+                        class="badge badge-{% if e.status == 'sent' %}green{% elif e.status == 'deferred' %}yellow{% else %}red{% endif %}">
+                        {{ e.status | upper }}
+                    </span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- ── Pagination ─────────────────────────────────────────────────────── -->
+{% if total_pages > 1 %}
+<div class="pagination">
+    {% if page > 1 %}
+    <a class="btn btn-xs btn-secondary"
+        href="/logs?ip={{ f_ip }}&sender={{ f_sender }}&recipient={{ f_recipient }}&date={{ f_date }}&status={{ f_status }}&page={{ page - 1 }}">
+        ← Prev
+    </a>
+    {% endif %}
+
+    <span class="page-info">Page {{ page }} of {{ total_pages }}</span>
+
+    {% if page < total_pages %} <a class="btn btn-xs btn-secondary"
+        href="/logs?ip={{ f_ip }}&sender={{ f_sender }}&recipient={{ f_recipient }}&date={{ f_date }}&status={{ f_status }}&page={{ page + 1 }}">
+        Next →
+        </a>
+        {% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="empty-state">
+    <p data-i18n="lbl_no_logs">No log entries match your filters.</p>
+    {% if f_ip or f_sender or f_recipient or f_date or f_status %}
+    <a href="/logs" class="btn btn-secondary mt-1" data-i18n="btn_clear_filter">Clear Filters</a>
+    {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

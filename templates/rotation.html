@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% set active_page = "rotation" %}
+
+{% block title %}IP Rotation – Postfix Relay Panel{% endblock %}
+{% block page_title %}IP Rotation Settings{% endblock %}
+
+{% block content %}
+
+<div class="layout-2col">
+
+    <!-- ── Config Form ──────────────────────────────────────────────────── -->
+    <div class="card form-card">
+        <h2 class="card-title" data-i18n="ttl_rot_config">Rotation Configuration</h2>
+        <form action="/rotation/save" method="post" class="form-stack">
+
+            <div class="form-group">
+                <label data-i18n="lbl_rot_interval">Rotation Interval</label>
+                <div class="preset-btns">
+                    <button type="button" class="btn btn-xs btn-secondary"
+                        onclick="setRotationInterval(30)">30s</button>
+                    <button type="button" class="btn btn-xs btn-secondary" onclick="setRotationInterval(60)">1m</button>
+                    <button type="button" class="btn btn-xs btn-secondary"
+                        onclick="setRotationInterval(300)">5m</button>
+                    <button type="button" class="btn btn-xs btn-secondary"
+                        onclick="setRotationInterval(600)">10m</button>
+                    <button type="button" class="btn btn-xs btn-secondary"
+                        onclick="setRotationInterval(1800)">30m</button>
+                    <button type="button" class="btn btn-xs btn-secondary"
+                        onclick="setRotationInterval(3600)">1h</button>
+                </div>
+                <div class="input-suffix">
+                    <input type="number" name="rotation_seconds" id="rotSecs" value="{{ rotation_secs }}" min="10"
+                        class="form-input" />
+                    <span class="suffix-label" data-i18n="lbl_seconds">seconds</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label data-i18n="lbl_rot_mode">Rotation Mode</label>
+                <div class="radio-group">
+                    <label class="radio-option {% if mode == 'weighted' %}selected{% endif %}">
+                        <input type="radio" name="mode" value="weighted" {% if mode=='weighted' %}checked{% endif %} />
+                        <span class="radio-box">
+                            <strong data-i18n="mode_weighted">Weighted</strong>
+                            <small data-i18n="mode_weighted_d">IPs with higher weight are selected more often</small>
+                        </span>
+                    </label>
+                    <label class="radio-option {% if mode == 'roundrobin' %}selected{% endif %}">
+                        <input type="radio" name="mode" value="roundrobin" {% if mode=='roundrobin' %}checked{% endif
+                            %} />
+                        <span class="radio-box">
+                            <strong data-i18n="mode_rr">Round Robin</strong>
+                            <small data-i18n="mode_rr_d">IPs selected equally in strict rotation order</small>
+                        </span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" data-i18n="btn_save_set">Save Settings</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- ── Status Panel ─────────────────────────────────────────────────── -->
+    <div>
+        <div class="card stat-card-lg">
+            <div class="stat-label" data-i18n="lbl_next_rot_in">Next Rotation In</div>
+            <div class="stat-value-xl" id="countdown">{{ time_remaining }}s</div>
+            <div class="stat-sub">Interval: {{ rotation_secs }}s · Mode: {{ mode }}</div>
+        </div>
+
+        <div class="card mt-2">
+            <h3 class="card-title" data-i18n="ttl_manual_rot">Manual Rotation</h3>
+            <p class="muted mb-2" data-i18n="txt_manual_rot">Force an immediate IP rotation, bypassing the timer.</p>
+            <form action="/rotation/trigger" method="post">
+                <button type="submit" class="btn btn-accent btn-full" data-i18n="btn_rotate_now">⟳ Rotate Now</button>
+            </form>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<meta name="rotation-remaining" content="{{ time_remaining }}">
+<script>
+    function setRotationInterval(val) {
+        document.getElementById('rotSecs').value = val;
+    }
+
+    let remaining = parseInt(document.querySelector('meta[name="rotation-remaining"]').content, 10);
+    const el = document.getElementById('countdown');
+    function tick() {
+        if (remaining > 0) { remaining--; el.textContent = remaining + 's'; }
+        else { el.textContent = 'Rotating...'; }
+    }
+    window.setInterval(tick, 1000);
+
+    // Highlight radio on click
+    document.querySelectorAll('.radio-option input').forEach(inp => {
+        inp.addEventListener('change', () => {
+            document.querySelectorAll('.radio-option').forEach(l => l.classList.remove('selected'));
+            inp.closest('.radio-option').classList.add('selected');
+        });
+    });
+</script>
+{% endblock %}

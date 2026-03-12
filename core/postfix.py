@@ -1,0 +1,121 @@
+"""
+core/postfix.py – Postfix service management and smtp_bind_address sync.
+
+IP Rotation strategy:
+  We set `smtp_bind_address` in /etc/postfix/main.cf so Postfix sends mail
+  directly to recipients (MX lookup) using the chosen IP as the SOURCE address.
+  This is the correct method for multi-IP outbound relay.
+
+  The transport map approach (routing mail *through* the IP) caused a relay
+  loop and is NOT used here.
+"""
+
+import os
+import subprocess
+from typing import Tuple
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+MAIN_CF = "/etc/postfix/main.cf"
+
+
+def get_status() -> str:
+    """Return 'running' | 'stopped' | 'unknown'."""
+    return _service_status("postfix")
+
+
+def reload_postfix() -> Tuple[bool, str]:
+    """Reload Postfix configuration without dropping connections."""
+    ok, out = _run("postfix reload")
+    if ok:
+        return True, "Postfix reloaded successfully."
+    return False, f"Reload failed: {out}"
+
+
+def sync_transport(active_ip: str) -> Tuple[bool, str]:
+    """
+    If the active IP has smtp_user/smtp_pass: Configure Postfix to use it as a Smarthost relay 
+    with SASL authentication.
+    Otherwise: Set smtp_bind_address so outbound connections originate from active_ip locally.
+    """
+    if not active_ip:
+        return False, "No active IP provided."
+
+    from core.fileio import read_json
+    config = read_json(os.path.join(BASE_DIR, "config", "relay_ips.json"), {"ips": []})
+    ip_cfg = next((x for x in config.get("ips", []) if x["ip"] == active_ip), None)
+    
+    if not ip_cfg:
+        return False, f"IP {active_ip} not found in config."
+
+    smtp_user = ip_cfg.get("smtp_user", "").strip()
+    smtp_pass = ip_cfg.get("smtp_pass", "").strip()
+
+    try:
+        if smtp_user and smtp_pass:
+            # --- SASL Smarthost Mode ---
+            _run("postconf -e 'smtp_bind_address='")  # clear local bind
+            _run(f"postconf -e 'relayhost=[{active_ip}]:587'") # or 25/465 depending on requirement, defaults to 587
+            _run("postconf -e 'smtp_sasl_auth_enable=yes'")
+            _run("postconf -e 'smtp_sasl_password_maps=hash:/etc/postfix/sasl_passwd'")
+            _run("postconf -e 'smtp_sasl_security_options=noanonymous'")
+            _run("postconf -e 'smtp_tls_security_level=may'")
+
+            sasl_content = f"[{active_ip}]:587 {smtp_user}:{smtp_pass}\n"
+            _write_if_possible("/etc/postfix/sasl_passwd", sasl_content)
+            
+            # Hash the passwd file
+            ok, out = _run("postmap /etc/postfix/sasl_passwd")
+            if not ok:
+                return False, f"postmap failed: {out}"
+                
+            msg = f"SASL Auth enabled for smarthost [{active_ip}] and Postfix reloaded."
+        else:
+            # --- Local Bind Mode ---
+            _run(f"postconf -e 'smtp_bind_address={active_ip}'")
+            _run("postconf -e 'relayhost='") # clear smarthost
+            _run("postconf -e 'smtp_sasl_auth_enable=no'")
+            
+            msg = f"smtp_bind_address set to {active_ip} and Postfix reloaded."
+
+        # Clear any stale transport_maps to avoid relay loops
+        _run("postconf -e 'transport_maps='")
+
+        # Reload Postfix to apply
+        ok2, out2 = _run("postfix reload")
+        if not ok2:
+            return False, f"Postfix reload failed: {out2}"
+
+        return True, msg
+    except Exception as e:
+        return False, str(e)
+
+
+# ── Internal helpers ─────────────────────────────────────────────────────────
+
+def _run(cmd: str) -> Tuple[bool, str]:
+    try:
+        result = subprocess.run(
+            cmd, shell=True, capture_output=True, text=True, timeout=15
+        )
+        out = (result.stdout + result.stderr).strip()
+        return result.returncode == 0, out
+    except FileNotFoundError:
+        return False, f"Command not found: {cmd} (expected Linux environment)"
+    except Exception as e:
+        return False, str(e)
+
+
+def _service_status(service: str) -> str:
+    ok, out = _run(f"systemctl is-active {service}")
+    if ok and out.strip() == "active":
+        return "running"
+    return "stopped"
+
+
+def _write_if_possible(path: str, content: str) -> None:
+    if not path.startswith("/"):
+        return  # skip on Windows dev
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        f.write(content)

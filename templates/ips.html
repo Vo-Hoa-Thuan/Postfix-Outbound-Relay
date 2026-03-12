@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% set active_page = "ips" %}
+
+{% block title %}IP Manager – Postfix Relay Panel{% endblock %}
+{% block page_title %}IP Relay Manager{% endblock %}
+
+{% block content %}
+
+<!-- ── Add IP form ──────────────────────────────────────────────────── -->
+<div class="card form-card">
+    <h2 class="card-title" data-i18n="ttl_add_ip">Add New Relay IP</h2>
+    <form action="/ips/add" method="post" class="form-grid">
+        <div class="form-group">
+            <label data-i18n="lbl_ip_addr">IP Address</label>
+            <input type="text" name="ip" placeholder="e.g. 1.2.3.4" required class="form-input" />
+        </div>
+        <div class="form-group">
+            <label data-i18n="lbl_weight">Weight</label>
+            <input type="number" name="weight" value="1" min="1" max="100" class="form-input" />
+        </div>
+        <div class="form-group">
+            <label data-i18n="lbl_limit_hr">Limit / Hour</label>
+            <input type="number" name="limit_per_hour" value="2000" min="0" class="form-input" />
+        </div>
+        <div class="form-group">
+            <label data-i18n="lbl_note">Note</label>
+            <input type="text" name="note" placeholder="Description (optional)" class="form-input" />
+        </div>
+        <div class="form-group">
+            <label data-i18n="lbl_smtp_user">SMTP User</label>
+            <input type="text" name="smtp_user" placeholder="Optional (for Smarthost)" class="form-input" />
+        </div>
+        <div class="form-group">
+            <label data-i18n="lbl_smtp_pass">SMTP Password</label>
+            <input type="password" name="smtp_pass" placeholder="Optional" class="form-input" />
+        </div>
+        <div class="form-group form-check-group">
+            <label class="toggle-label">
+                <input type="checkbox" name="enabled" value="on" checked class="toggle-input" />
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                <span data-i18n="lbl_enabled">Enabled</span>
+            </label>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary" data-i18n="btn_add_ip">+ Add IP</button>
+        </div>
+    </form>
+</div>
+
+<!-- ── IP Table ─────────────────────────────────────────────────────── -->
+<div class="section-header">
+    <h2><span data-i18n="ttl_relay_ips">Relay IPs</span> ({{ ips | length }})</h2>
+</div>
+
+{% if ips %}
+<div class="card">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th data-i18n="col_ip">IP Address</th>
+                <th data-i18n="col_status">Status</th>
+                <th data-i18n="lbl_weight">Weight</th>
+                <th data-i18n="lbl_limit_hr">Limit / Hr</th>
+                <th data-i18n="lbl_smtp_user">SMTP Auth</th>
+                <th data-i18n="lbl_note">Note</th>
+                <th data-i18n="col_actions">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ip in ips %}
+            <tr class="{% if ip.ip == active_ip %}row-active{% endif %}" id="row-{{ loop.index }}">
+                <td>
+                    <span class="mono">{{ ip.ip }}</span>
+                    {% if ip.ip == active_ip %}<span class="badge badge-blue ml-1">ACTIVE</span>{% endif %}
+                </td>
+                <td>
+                    <form action="/ips/toggle" method="post" style="display:inline">
+                        <input type="hidden" name="ip" value="{{ ip.ip }}" />
+                        <button type="submit" class="badge-btn badge-{% if ip.enabled %}green{% else %}red{% endif %}">
+                            {% if ip.enabled %}ENABLED{% else %}DISABLED{% endif %}
+                        </button>
+                    </form>
+                </td>
+                <td>{{ ip.weight }}</td>
+                <td>{{ ip.limit_per_hour }}</td>
+                <td class="muted">{% if ip.smtp_user %}YES ({{ ip.smtp_user }}){% else %}None{% endif %}</td>
+                <td class="muted">{{ ip.note or "—" }}</td>
+                <td>
+                    <div class="action-btns">
+                        <button class="btn btn-xs btn-secondary" data-ip="{{ ip.ip }}" data-weight="{{ ip.weight }}"
+                            data-limit="{{ ip.limit_per_hour }}" data-note="{{ ip.note | e }}"
+                            data-smtp-user="{{ ip.smtp_user | default('') | e }}" data-smtp-pass="{{ ip.smtp_pass | default('') | e }}"
+                            data-enabled="{{ ip.enabled | lower }}" onclick="openEditFromBtn(this)"
+                            data-i18n="btn_edit">Edit</button>
+                        {% if ip.ip != active_ip %}
+                        <form action="/ips/delete" method="post" style="display:inline"
+                            onsubmit="return confirm('Delete {{ ip.ip }}?')">
+                            <input type="hidden" name="ip" value="{{ ip.ip }}" />
+                            <button type="submit" class="btn btn-xs btn-danger" data-i18n="btn_delete">Delete</button>
+                        </form>
+                        {% else %}
+                        <button class="btn btn-xs btn-danger" disabled title="Cannot delete active IP"
+                            data-i18n="btn_delete">Delete</button>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state">
+    <p data-i18n="lbl_no_ips">No relay IPs configured yet. Add one above.</p>
+</div>
+{% endif %}
+
+<!-- ── Edit Modal ────────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="editModal" style="display:none" onclick="if(event.target===this)closeEdit()">
+    <div class="modal">
+        <div class="modal-header">
+            <h3><span data-i18n="ttl_edit_ip">Edit IP:</span> <span id="editIpDisplay" class="mono"></span></h3>
+            <button class="modal-close" onclick="closeEdit()">✕</button>
+        </div>
+        <form action="/ips/edit" method="post" class="form-grid">
+            <input type="hidden" name="ip" id="editIp" />
+            <div class="form-group">
+                <label data-i18n="lbl_weight">Weight</label>
+                <input type="number" name="weight" id="editWeight" min="1" max="100" class="form-input" />
+            </div>
+            <div class="form-group">
+                <label data-i18n="lbl_limit_hr">Limit / Hour</label>
+                <input type="number" name="limit_per_hour" id="editLimit" min="0" class="form-input" />
+            </div>
+            <div class="form-group">
+                <label data-i18n="lbl_note">Note</label>
+                <input type="text" name="note" id="editNote" class="form-input" />
+            </div>
+            <div class="form-group">
+                <label data-i18n="lbl_smtp_user">SMTP User</label>
+                <input type="text" name="smtp_user" id="editSmtpUser" placeholder="Optional" class="form-input" />
+            </div>
+            <div class="form-group">
+                <label data-i18n="lbl_smtp_pass">SMTP Password</label>
+                <input type="password" name="smtp_pass" id="editSmtpPass" placeholder="Optional" class="form-input" />
+            </div>
+            <div class="form-group form-check-group">
+                <label class="toggle-label">
+                    <input type="checkbox" name="enabled" id="editEnabled" value="on" class="toggle-input" />
+                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                    <span data-i18n="lbl_enabled">Enabled</span>
+                </label>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeEdit()"
+                    data-i18n="btn_cancel">Cancel</button>
+                <button type="submit" class="btn btn-primary" data-i18n="btn_save">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function openEditFromBtn(btn) {
+        var ip = btn.dataset.ip;
+        var weight = btn.dataset.weight;
+        var limit = btn.dataset.limit;
+        var note = btn.dataset.note;
+        var smtpUser = btn.dataset.smtpUser;
+        var smtpPass = btn.dataset.smtpPass;
+        var enabled = btn.dataset.enabled === 'true';
+        document.getElementById('editIp').value = ip;
+        document.getElementById('editIpDisplay').textContent = ip;
+        document.getElementById('editWeight').value = weight;
+        document.getElementById('editLimit').value = limit;
+        document.getElementById('editNote').value = note;
+        document.getElementById('editSmtpUser').value = smtpUser;
+        document.getElementById('editSmtpPass').value = smtpPass;
+        document.getElementById('editEnabled').checked = enabled;
+        document.getElementById('editModal').style.display = 'flex';
+    }
+    function closeEdit() {
+        document.getElementById('editModal').style.display = 'none';
+    }
+
+</script>
+{% endblock %}

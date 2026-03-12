@@ -1,0 +1,12 @@
+{
+  "enable": true,
+  "required_score": 6.0,
+  "greylist": true,
+  "rate_limit": {
+    "enable": true,
+    "burst": 100,
+    "rate": "50 / 1min"
+  },
+  "whitelist_ips": [],
+  "blacklist_domains": []
+}
