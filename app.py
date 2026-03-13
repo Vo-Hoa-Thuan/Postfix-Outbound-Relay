@@ -93,7 +93,7 @@ async def _init_defaults():
         os.makedirs(os.path.dirname(parsed_log), exist_ok=True)
         open(parsed_log, "w").close()
 
-    print("[RelayPanel] ✓ Startup complete – all config files verified.")
+    print("[RelayPanel] Startup complete - all config files verified.")
     asyncio.create_task(_rotation_loop())
 
 

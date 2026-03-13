@@ -19,6 +19,7 @@ async def dashboard(request: Request):
     from core.rspamd    import get_status as rspamd_status
     from core.relay     import get_active_ip, get_total_sent_this_hour, get_all_counters
     from core.rotation  import get_time_remaining, get_rotation_config
+    from core.fileio    import read_json
 
     active_ip_cfg  = get_active_ip()
     active_ip      = active_ip_cfg["ip"] if active_ip_cfg else "—"
@@ -28,6 +29,11 @@ async def dashboard(request: Request):
 
     # Count deferred (from parsed log, last 100 entries)
     deferred = _count_deferred_this_hour()
+    
+    # Get blacklisted IPs (disabled with 'BLACKLISTED' in note)
+    RELAY_IPS_FILE = os.path.join(BASE_DIR, "config", "relay_ips.json")
+    all_ips = read_json(RELAY_IPS_FILE, {"ips": []}).get("ips", [])
+    blacklisted_ips = [ip for ip in all_ips if not ip.get("enabled", True) and "BLACKLISTED" in ip.get("note", "")]
 
     return templates.TemplateResponse("dashboard.html", {
         "request":         request,
@@ -41,6 +47,7 @@ async def dashboard(request: Request):
         "total_sent":      get_total_sent_this_hour(),
         "total_deferred":  deferred,
         "counters":        counters,
+        "blacklisted_ips": blacklisted_ips,
     })
 
 
@@ -50,6 +57,7 @@ async def api_status():
     from core.rspamd    import get_status as rspamd_status
     from core.relay     import get_active_ip, get_total_sent_this_hour, get_all_counters
     from core.rotation  import get_time_remaining, get_rotation_config
+    from core.fileio    import read_json
 
     active_ip_cfg  = get_active_ip()
     active_ip      = active_ip_cfg["ip"] if active_ip_cfg else "—"
@@ -67,7 +75,8 @@ async def api_status():
         "rotation_secs":   rotation_cfg.get("rotation_seconds", 60),
         "time_remaining":  time_remaining,
         "total_sent":      get_total_sent_this_hour(),
-        "total_deferred":  _count_deferred_this_hour()
+        "total_deferred":  _count_deferred_this_hour(),
+        "blacklisted_count": len([ip for ip in read_json(os.path.join(BASE_DIR, "config", "relay_ips.json"), {"ips": []}).get("ips", []) if not ip.get("enabled", True) and "BLACKLISTED" in ip.get("note", "")])
     }
 
 

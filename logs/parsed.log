@@ -1,8 +1,0 @@
-{"time": "2026-02-25 10:00:01", "from": "sender@example.com", "to": "john@gmail.com", "subject": "Hello World", "dest_ip": "142.250.4.27", "local_ip": "103.10.10.1", "status": "sent"}
-{"time": "2026-02-25 10:01:15", "from": "noreply@shop.com", "to": "jane@yahoo.com", "subject": "Your Order Confirmed", "dest_ip": "98.137.246.8", "local_ip": "103.10.10.1", "status": "sent"}
-{"time": "2026-02-25 10:02:30", "from": "alerts@system.com", "to": "admin@corp.com", "subject": "Server Alert", "dest_ip": "209.85.128.0", "local_ip": "103.10.10.2", "status": "deferred"}
-{"time": "2026-02-25 10:03:45", "from": "news@updates.com", "to": "user@hotmail.com", "subject": "Weekly Newsletter", "dest_ip": "40.101.65.20", "local_ip": "103.10.10.2", "status": "sent"}
-{"time": "2026-02-25 10:05:00", "from": "sender@example.com", "to": "bob@outlook.com", "subject": "Invoice #1234", "dest_ip": "52.101.65.10", "local_ip": "103.10.10.1", "status": "sent"}
-{"time": "2026-02-25 10:07:22", "from": "billing@saas.io", "to": "client@business.vn", "subject": "Payment Receipt", "dest_ip": "142.250.10.17", "local_ip": "103.10.10.1", "status": "sent"}
-{"time": "2026-02-25 10:09:41", "from": "no-reply@app.com", "to": "member@domain.net", "subject": "Verify Your Email", "dest_ip": "66.102.0.0", "local_ip": "103.10.10.2", "status": "bounced"}
-{"time": "2026-02-25 10:12:05", "from": "support@helpdesk.com", "to": "ticket@org.com", "subject": "Re: Ticket #5678", "dest_ip": "209.85.129.17", "local_ip": "103.10.10.1", "status": "sent"}

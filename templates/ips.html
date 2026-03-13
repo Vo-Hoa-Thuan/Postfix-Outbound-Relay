@@ -12,7 +12,11 @@
     <form action="/ips/add" method="post" class="form-grid">
         <div class="form-group">
             <label data-i18n="lbl_ip_addr">IP Address</label>
-            <input type="text" name="ip" placeholder="e.g. 1.2.3.4" required class="form-input" />
+            <input type="text" name="ip" placeholder="e.g. 1.2.3.4" class="form-input" />
+        </div>
+        <div class="form-group">
+            <label>Hostname</label>
+            <input type="text" name="hostname" placeholder="e.g. relay1.example.com" class="form-input" />
         </div>
         <div class="form-group">
             <label data-i18n="lbl_weight">Weight</label>
@@ -58,8 +62,11 @@
 </div>
 
 <!-- ── IP Table ─────────────────────────────────────────────────────── -->
-<div class="section-header">
+<div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
     <h2><span data-i18n="ttl_relay_ips">Relay IPs</span> ({{ ips | length }})</h2>
+    <form action="/ips/check-all-blacklist" method="post">
+        <button type="submit" class="btn btn-secondary">🛡️ Check All Blacklists</button>
+    </form>
 </div>
 
 {% if ips %}
@@ -67,8 +74,9 @@
     <table class="data-table">
         <thead>
             <tr>
-                <th data-i18n="col_ip">IP Address</th>
+                <th data-i18n="col_ip">IP/Hostname</th>
                 <th data-i18n="col_status">Status</th>
+                <th title="Last Blacklist Check">Last BL Check</th>
                 <th data-i18n="lbl_weight">Weight</th>
                 <th data-i18n="lbl_limit_hr">Limit / Hr</th>
                 <th data-i18n="lbl_smtp_user">SMTP Auth</th>
@@ -81,6 +89,7 @@
             <tr class="{% if ip.ip == active_ip %}row-active{% endif %}" id="row-{{ loop.index }}">
                 <td>
                     <span class="mono">{{ ip.ip }}</span>
+                    {% if ip.hostname %}<br><small class="muted">{{ ip.hostname }}</small>{% endif %}
                     {% if ip.ip == active_ip %}<span class="badge badge-blue ml-1">ACTIVE</span>{% endif %}
                 </td>
                 <td>
@@ -91,6 +100,7 @@
                         </button>
                     </form>
                 </td>
+                <td class="muted" style="font-size: 0.85em;">{{ ip.last_blacklist_check_str }}</td>
                 <td>{{ ip.weight }}</td>
                 <td>
                     {% if ip.warmup_enabled %}
@@ -103,7 +113,7 @@
                 <td class="muted">{{ ip.note or "—" }}</td>
                 <td>
                     <div class="action-btns">
-                        <button class="btn btn-xs btn-secondary" data-ip="{{ ip.ip }}" data-weight="{{ ip.weight }}"
+                        <button class="btn btn-xs btn-secondary" data-ip="{{ ip.ip }}" data-hostname="{{ ip.hostname | default('') | e }}" data-weight="{{ ip.weight }}"
                             data-limit="{{ ip.limit_per_hour }}" data-note="{{ ip.note | e }}"
                             data-smtp-user="{{ ip.smtp_user | default('') | e }}" data-smtp-pass="{{ ip.smtp_pass | default('') | e }}"
                             data-enabled="{{ ip.enabled | lower }}" 
@@ -113,7 +123,7 @@
                             data-i18n="btn_edit">Edit</button>
                         <form action="/ips/check-blacklist" method="post" style="display:inline">
                             <input type="hidden" name="ip" value="{{ ip.ip }}" />
-                            <button type="submit" class="btn btn-xs btn-secondary" title="Check Blacklist">🛡️</button>
+                            <button type="submit" class="btn btn-xs btn-secondary" title="Check Blacklist">🛡️ Check BL</button>
                         </form>
                         {% if ip.ip != active_ip %}
                         <form action="/ips/delete" method="post" style="display:inline"
@@ -147,6 +157,10 @@
         </div>
         <form action="/ips/edit" method="post" class="form-grid">
             <input type="hidden" name="ip" id="editIp" />
+            <div class="form-group">
+                <label>Hostname</label>
+                <input type="text" name="hostname" id="editHostname" placeholder="Optional" class="form-input" />
+            </div>
             <div class="form-group">
                 <label data-i18n="lbl_weight">Weight</label>
                 <input type="number" name="weight" id="editWeight" min="1" max="100" class="form-input" />
@@ -199,6 +213,7 @@
 <script>
     function openEditFromBtn(btn) {
         var ip = btn.dataset.ip;
+        var hostname = btn.dataset.hostname;
         var weight = btn.dataset.weight;
         var limit = btn.dataset.limit;
         var note = btn.dataset.note;
@@ -209,6 +224,7 @@
         var warmupStart = btn.dataset.warmupStart;
         
         document.getElementById('editIp').value = ip;
+        document.getElementById('editHostname').value = hostname;
         document.getElementById('editIpDisplay').textContent = ip;
         document.getElementById('editWeight').value = weight;
         document.getElementById('editLimit').value = limit;

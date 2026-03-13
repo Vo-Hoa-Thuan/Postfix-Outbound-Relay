@@ -17,6 +17,12 @@
             <input type="text" name="mxtoolbox_api_key" value="{{ settings.mxtoolbox_api_key }}" placeholder="Enter MXToolbox API Key" class="form-input" />
             <small class="muted">Used for automatic IP Blacklist checking.</small>
         </div>
+        
+        <div class="form-group" style="grid-column: 1 / -1;">
+            <label>Automatic Blacklist Check Interval (Hours)</label>
+            <input type="number" name="blacklist_check_interval" value="{{ settings.blacklist_check_interval or 12 }}" min="1" class="form-input" />
+            <small class="muted">How often the system should automatically check all IPs against blacklists.</small>
+        </div>
 
         <div class="section-header" style="grid-column: 1 / -1; margin-top: 20px;">
             <h3>Email Alerting (SMTP)</h3>

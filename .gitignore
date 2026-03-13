@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.env
+venv/
+.venv/
+env/
+config/settings.json
+config/relay_ips.json
+config/rotation.json
+config/rspamd.json
+config/limits.json
+runtime/*.json
+logs/*.log
+*.swp
+.DS_Store

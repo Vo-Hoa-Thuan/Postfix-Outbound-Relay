@@ -63,31 +63,36 @@ def process_ip_blacklist_alert(ip_address: str):
     
     result = check_ip_blacklist(ip_address)
     
-    if result.get("is_blacklisted"):
-        # IP is on a blacklist!
-        details = result.get("details", [])
-        reasons = ", ".join([d.get("Name", "Unknown") for d in details])
-        
-        # Disable the IP in configuration
-        config = read_json(RELAY_IPS_FILE, {"ips": []})
-        modified = False
-        for ip_data in config.get("ips", []):
-            if ip_data.get("ip") == ip_address and ip_data.get("enabled", True):
-                ip_data["enabled"] = False
-                ip_data["note"] = f"(BLACKLISTED on {reasons}) " + ip_data.get("note", "")
-                modified = True
-                break
-                
-        if modified:
-            write_json(RELAY_IPS_FILE, config)
-            # Send Alert
-            alert_msg = f"CRITICAL: IP Address {ip_address} has been blacklisted!\n\n" \
-                        f"Detected on the following blacklists:\n{reasons}\n\n" \
-                        f"Action Taken: The system has automatically DISABLED this IP to protect your sender reputation."
-            send_alert(f"IP {ip_address} BLACKLISTED!", alert_msg)
+    # Always update last check timestamp
+    import time
+    config = read_json(RELAY_IPS_FILE, {"ips": []})
+    modified = False
+    for ip_data in config.get("ips", []):
+        if ip_data.get("ip") == ip_address:
+            ip_data["last_blacklist_check"] = time.time()
+            modified = True
             
-        return True
-    return False
+            if result.get("is_blacklisted"):
+                # IP is on a blacklist!
+                details = result.get("details", [])
+                reasons = ", ".join([d.get("Name", "Unknown") for d in details])
+                
+                # Disable the IP in configuration
+                if ip_data.get("enabled", True):
+                    ip_data["enabled"] = False
+                    ip_data["note"] = f"(BLACKLISTED on {reasons}) " + ip_data.get("note", "")
+                    
+                    # Send Alert
+                    alert_msg = f"CRITICAL: IP Address {ip_address} has been blacklisted!\n\n" \
+                                f"Detected on the following blacklists:\n{reasons}\n\n" \
+                                f"Action Taken: The system has automatically DISABLED this IP to protect your sender reputation."
+                    send_alert(f"IP {ip_address} BLACKLISTED!", alert_msg)
+            break
+                
+    if modified:
+        write_json(RELAY_IPS_FILE, config)
+        
+    return result.get("is_blacklisted", False)
 
 def auto_check_all():
     """
@@ -101,11 +106,16 @@ def auto_check_all():
     RELAY_IPS_FILE = os.path.join(BASE_DIR, "config", "relay_ips.json")
     LAST_CHECK_FILE = os.path.join(BASE_DIR, "runtime", "last_blacklist_check.json")
     
-    # Check max once every 12 hours to save API calls
+    # Get interval from settings (default 12 hours)
+    settings = get_settings()
+    interval_hours = settings.get("blacklist_check_interval", 12)
+    interval_seconds = interval_hours * 3600
+    
+    # Check max once every configured interval hours to save API calls
     last_check_data = read_json(LAST_CHECK_FILE, {"last_check": 0})
     now = time.time()
     
-    if now - last_check_data.get("last_check", 0) < 43200:  # 12 hours
+    if now - last_check_data.get("last_check", 0) < interval_seconds:
         return
         
     config = read_json(RELAY_IPS_FILE, {"ips": []})

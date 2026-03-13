@@ -34,7 +34,8 @@ async def save_settings_post(
     smtp_user: str = Form(""),
     smtp_pass: str = Form(""),
     from_email: str = Form(""),
-    to_email: str = Form("")
+    to_email: str = Form(""),
+    blacklist_check_interval: int = Form(12)
 ):
     settings = get_settings()
     settings["mxtoolbox_api_key"] = mxtoolbox_api_key.strip()
@@ -48,6 +49,8 @@ async def save_settings_post(
         "from_email": from_email.strip(),
         "to_email": to_email.strip()
     }
+    
+    settings["blacklist_check_interval"] = max(1, blacklist_check_interval)
     
     save_settings(settings)
     return RedirectResponse("/settings?msg=Settings+saved+successfully", status_code=303)

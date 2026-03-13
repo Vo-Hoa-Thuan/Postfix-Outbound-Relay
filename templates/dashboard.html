@@ -5,6 +5,26 @@
 {% block page_title %}Dashboard{% endblock %}
 
 {% block content %}
+<!-- ── Blacklist Warning ── -->
+<div id="blacklist-warning" style="{% if not blacklisted_ips %}display:none;{% endif %} margin-bottom: 20px;">
+    <div class="card" style="border-left: 5px solid var(--danger); background: rgba(239, 68, 68, 0.1);">
+        <h3 style="color: var(--danger); display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+            ⚠️ <span>CRITICAL: Blacklisted IPs Detected</span>
+        </h3>
+        <p class="muted">The following IPs have been automatically disabled to protect your reputation:</p>
+        <ul id="blacklisted-list" style="margin-top: 10px; list-style: none; padding: 0;">
+            {% for ip in blacklisted_ips %}
+            <li style="padding: 5px 10px; background: rgba(239, 68, 68, 0.1); border-radius: 4px; display: inline-block; margin-right: 10px; margin-bottom: 5px;" class="mono">
+                {{ ip.ip }}
+            </li>
+            {% endfor %}
+        </ul>
+        <div style="margin-top: 15px;">
+            <a href="/ips" class="btn btn-xs btn-danger">Manage IPs</a>
+        </div>
+    </div>
+</div>
+
 <!-- ── Status Cards ─────────────────────────────────────────────────── -->
 <div class="cards-grid">
 
@@ -59,6 +79,7 @@
     </div>
 
 </div>
+
 
 <!-- ── Analytics Chart ────────────────────────────────────────────────── -->
 <div class="section-header">
@@ -154,6 +175,11 @@
                 // Update counters
                 statCards[4].querySelector('.stat-value').textContent = data.total_sent;
                 statCards[5].querySelector('.stat-value').textContent = data.total_deferred;
+
+                const warnBox = document.getElementById('blacklist-warning');
+                if (warnBox) {
+                    warnBox.style.display = (data.blacklisted_count > 0) ? 'block' : 'none';
+                }
 
                 if (data.time_remaining === 0) {
                     countdownEl.textContent = 'Rotating...';
