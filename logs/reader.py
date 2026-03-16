@@ -78,126 +78,146 @@ def _parse_timestamp(month: str, day: str, t: str, year: Optional[str] = None) -
     y = year if year else _current_year()
     return f"{y}-{m:02d}-{int(day):02d} {t}"
 
-def parse_maillog(limit: int = 2000) -> None:
+def parse_maillog(limit_per_file: int = 2000) -> None:
     """
-    Read new lines from system mail logs and append structured JSON to parsed.log.
+    Read new lines from all found system mail logs and append structured JSON to parsed.log.
     """
-    # Search common log locations (Postfix & Kerio)
     log_paths = [
-        "/var/log/maillog", 
-        "/var/log/mail.log",
         "/home/rescopykeriofirst/store/logs/mail.log",
         "/opt/kerio/mailserver/store/logs/mail.log",
         "/usr/local/kerio/mailserver/store/logs/mail.log",
-        "/var/lib/kerio/mailserver/logs/mail.log"
+        "/var/lib/kerio/mailserver/logs/mail.log",
+        "/var/log/maillog", 
+        "/var/log/mail.log",
     ]
-    target_log = None
-    for p in log_paths:
-        if os.path.exists(p):
-            target_log = p
-            # In case multiple exist, we might want to track which one we use or parse all.
-            # For now, let's just pick the first one that exists.
-            break
-            
-    if not target_log:
+    
+    found_logs = [p for p in log_paths if os.path.exists(p)]
+    if not found_logs:
         print("[LogReader] No mail log found in common paths.")
         return
 
-    print(f"[LogReader] Using log file: {target_log}")
-
     state = _read_state()
-    offset = state.get("offset")
-    
-    # If this is the VERY first time running (no state), start from 0 
-    # so we see recent activity immediately.
-    if offset is None:
-        offset = 0
-        print(f"[LogReader] Initializing state, starting from offset 0")
+    # state can be {"offset": N} (old version) or {"offsets": {path: N}} (new version)
+    if "offsets" not in state:
+        # Migrate old state if exists
+        old_offset = state.get("offset")
+        state = {"offsets": {}}
+        # If there was an old offset, we don't know which file it was for, 
+        # so we'll just start fresh to be safe or assign it to the first found log.
+        if old_offset is not None and found_logs:
+            state["offsets"][found_logs[0]] = old_offset
 
-    # If log rotated (current log smaller than offset), reset to 0
-    file_size = os.path.getsize(target_log)
-    if file_size < offset:
-        print(f"[LogReader] Log rotation detected, resetting offset to 0")
-        offset = 0
+    total_new_events = 0
 
-    entries = []
-    new_offset = offset
+    for target_log in found_logs:
+        print(f"[LogReader] Processing: {target_log}")
+        
+        offset = state["offsets"].get(target_log)
+        if offset is None:
+            offset = 0
+            print(f"  -> Initializing offset for {target_log}")
 
-    try:
-        with open(target_log, "r", errors="replace") as f:
-            f.seek(offset)
-            count = 0
-            for line in f:
-                new_offset = f.tell()
-                count += 1
-                
-                # --- [1] POSTFIX PARSING ---
-                m_smtp = RE_SMTP.search(line)
-                if m_smtp:
-                    # ... (rest of logic)
-                    entry = {
-                        "time":     _parse_timestamp(m_smtp.group("month"), m_smtp.group("day"), m_smtp.group("time")),
-                        "qid":      m_smtp.group("qid"),
-                        "from":     "",
-                        "to":       m_smtp.group("to"),
-                        "subject":  "",
-                        "dest_ip":  "",
-                        "status":   m_smtp.group("status").lower(),
-                    }
-                    rip = RE_RELAY_IP.search(line)
-                    if rip: entry["dest_ip"] = rip.group("ip")
-                    fm = RE_FROM.search(line)
-                    if fm: entry["from"] = fm.group(1)
-                    sm = RE_SUBJ.search(line)
-                    if sm: entry["subject"] = sm.group(1).strip()
-                    entries.append(entry)
-                    continue
+        file_size = os.path.getsize(target_log)
+        if file_size < offset:
+            print(f"  -> Log rotation detected for {target_log}, resetting to 0")
+            offset = 0
 
-                m_rej = RE_REJECT.search(line)
-                if m_rej:
-                    entry = {
-                        "time":     _parse_timestamp(m_rej.group("month"), m_rej.group("day"), m_rej.group("time")),
-                        "qid":      "REJECT",
-                        "from":     m_rej.group("from"),
-                        "to":       m_rej.group("to"),
-                        "subject":  f"Rejected: {m_rej.group('reason').strip()[:60]}",
-                        "dest_ip":  "blocked",
-                        "status":   "rejected",
-                    }
-                    entries.append(entry)
-                    continue
+        entries = []
+        new_offset = offset
 
-                # --- [2] KERIO CONNECT PARSING ---
-                mk_sent = RE_KERIO_SENT.search(line)
-                if mk_sent:
-                    entry = {
-                        "time":     _parse_timestamp(mk_sent.group("month"), mk_sent.group("day"), mk_sent.group("time"), mk_sent.group("year")),
-                        "qid":      mk_sent.group("qid"),
-                        "from":     "", # Recv line has 'from'
-                        "to":       mk_sent.group("to"),
-                        "subject":  "", # Recv line has 'subject'
-                        "dest_ip":  "",
-                        "status":   mk_sent.group("status").lower() if mk_sent.group("status") else "sent",
-                    }
-                    entries.append(entry)
-                    continue
+        try:
+            with open(target_log, "r", errors="replace") as f:
+                f.seek(offset)
+                count = 0
+                for line in f:
+                    new_offset = f.tell()
+                    count += 1
+                    
+                    # --- [1] POSTFIX PARSING ---
+                    m_smtp = RE_SMTP.search(line)
+                    if m_smtp:
+                        entry = {
+                            "time":     _parse_timestamp(m_smtp.group("month"), m_smtp.group("day"), m_smtp.group("time")),
+                            "qid":      m_smtp.group("qid"),
+                            "from":     "",
+                            "to":       m_smtp.group("to"),
+                            "subject":  "",
+                            "dest_ip":  "",
+                            "status":   m_smtp.group("status").lower(),
+                        }
+                        rip = RE_RELAY_IP.search(line)
+                        if rip: entry["dest_ip"] = rip.group("ip")
+                        fm = RE_FROM.search(line)
+                        if fm: entry["from"] = fm.group(1)
+                        sm = RE_SUBJ.search(line)
+                        if sm: entry["subject"] = sm.group(1).strip()
+                        entries.append(entry)
+                        continue
 
-                mk_recv = RE_KERIO_RECV.search(line)
-                if mk_recv:
-                    entry = {
-                        "time":     _parse_timestamp(mk_recv.group("month"), mk_recv.group("day"), mk_recv.group("time"), mk_recv.group("year")),
-                        "qid":      mk_recv.group("qid"),
-                        "from":     mk_recv.group("from"),
-                        "to":       mk_recv.group("to"),
-                        "subject":  mk_recv.group("subject").strip(),
-                        "dest_ip":  "incoming",
-                        "status":   "received",
-                    }
-                    entries.append(entry)
-                    continue
+                    m_rej = RE_REJECT.search(line)
+                    if m_rej:
+                        entry = {
+                            "time":     _parse_timestamp(m_rej.group("month"), m_rej.group("day"), m_rej.group("time")),
+                            "qid":      "REJECT",
+                            "from":     m_rej.group("from"),
+                            "to":       m_rej.group("to"),
+                            "subject":  f"Rejected: {m_rej.group('reason').strip()[:60]}",
+                            "dest_ip":  "blocked",
+                            "status":   "rejected",
+                        }
+                        entries.append(entry)
+                        continue
 
-                if count >= limit:
-                    break
+                    # --- [2] KERIO CONNECT PARSING ---
+                    mk_sent = RE_KERIO_SENT.search(line)
+                    if mk_sent:
+                        entry = {
+                            "time":     _parse_timestamp(mk_sent.group("month"), mk_sent.group("day"), mk_sent.group("time"), mk_sent.group("year")),
+                            "qid":      mk_sent.group("qid"),
+                            "from":     "",
+                            "to":       mk_sent.group("to"),
+                            "subject":  "",
+                            "dest_ip":  "",
+                            "status":   mk_sent.group("status").lower() if mk_sent.group("status") else "sent",
+                        }
+                        entries.append(entry)
+                        continue
+
+                    mk_recv = RE_KERIO_RECV.search(line)
+                    if mk_recv:
+                        entry = {
+                            "time":     _parse_timestamp(mk_recv.group("month"), mk_recv.group("day"), mk_recv.group("time"), mk_recv.group("year")),
+                            "qid":      mk_recv.group("qid"),
+                            "from":     mk_recv.group("from"),
+                            "to":       mk_recv.group("to"),
+                            "subject":  mk_recv.group("subject").strip(),
+                            "dest_ip":  "incoming",
+                            "status":   "received",
+                        }
+                        entries.append(entry)
+                        continue
+
+                    if count >= limit_per_file:
+                        break
+
+            if entries:
+                with open(PARSED_LOG, "a", encoding="utf-8") as out:
+                    for e in entries:
+                        out.write(json.dumps(e, ensure_ascii=False) + "\n")
+                print(f"  -> Found {len(entries)} events.")
+                total_new_events += len(entries)
+
+            state["offsets"][target_log] = new_offset
+            
+        except Exception as e:
+            print(f"  -> Error reading {target_log}: {e}")
+
+    _write_state(state)
+    if total_new_events > 0:
+        print(f"[LogReader] Total new events: {total_new_events}")
+
+if __name__ == "__main__":
+    parse_maillog()
 
         if entries:
             # Atomic append or just normal append? Normal append is fine for logs.
