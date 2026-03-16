@@ -86,6 +86,7 @@ def parse_maillog(limit: int = 2000) -> None:
     log_paths = [
         "/var/log/maillog", 
         "/var/log/mail.log",
+        "/home/rescopykeriofirst/store/logs/mail.log",
         "/opt/kerio/mailserver/store/logs/mail.log",
         "/usr/local/kerio/mailserver/store/logs/mail.log",
         "/var/lib/kerio/mailserver/logs/mail.log"
