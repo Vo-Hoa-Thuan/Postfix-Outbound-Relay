@@ -1,11 +1,12 @@
 """
-logs/reader.py – Parse Postfix logs and write structured JSON entries to logs/parsed.log.
+logs/reader.py – Parse Postfix and Kerio Connect logs and write structured JSON entries to logs/parsed.log.
 """
 
 import os
 import re
 import json
 import time
+from typing import Optional
 
 # Paths -----------------------------------------------------------------------
 BASE_DIR   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -13,7 +14,7 @@ PARSED_LOG = os.path.join(BASE_DIR, "logs", "parsed.log")
 STATE_FILE = os.path.join(BASE_DIR, "runtime", "reader_state.json")
 
 # Regex patterns --------------------------------------------------------------
-# We use more flexible patterns to handle different OS log formats
+# Postfix
 RE_SMTP = re.compile(
     r"(?P<month>\w+)\s+(?P<day>\d+)\s+(?P<time>\d+:\d+:\d+)"
     r".*?postfix/(smtps/)?smtp\[\d+\]:\s+(?P<qid>\w+):\s+"
@@ -33,7 +34,7 @@ RE_RELAY_IP = re.compile(r"relay=[^[]+\[(?P<ip>\d+\.\d+\.\d+\.\d+)\]")
 RE_FROM     = re.compile(r"from=<([^>]+)>")
 RE_SUBJ     = re.compile(r"subject=([^,\n]+)")
 
-# Regex patterns for Kerio Connect --------------------------------------------
+# Kerio Connect
 RE_KERIO_SENT = re.compile(
     r"\[(?P<day>\d+)/(?P<month>\w+)/(?P<year>\d+)\s+(?P<time>\d+:\d+:\d+)\]\s+"
     r"Sent:\s+Queue-ID:\s+(?P<qid>[^,]+),\s+Recipient:\s+<(?P<to>[^>]+)>,\s+"
@@ -71,8 +72,6 @@ def _write_state(state: dict) -> None:
 def _current_year() -> int:
     return time.localtime().tm_year
 
-from typing import Optional
-
 def _parse_timestamp(month: str, day: str, t: str, year: Optional[str] = None) -> str:
     m = MONTH_MAP.get(month, 1)
     y = year if year else _current_year()
@@ -97,15 +96,8 @@ def parse_maillog(limit_per_file: int = 2000) -> None:
         return
 
     state = _read_state()
-    # state can be {"offset": N} (old version) or {"offsets": {path: N}} (new version)
     if "offsets" not in state:
-        # Migrate old state if exists
-        old_offset = state.get("offset")
         state = {"offsets": {}}
-        # If there was an old offset, we don't know which file it was for, 
-        # so we'll just start fresh to be safe or assign it to the first found log.
-        if old_offset is not None and found_logs:
-            state["offsets"][found_logs[0]] = old_offset
 
     total_new_events = 0
 
@@ -214,22 +206,7 @@ def parse_maillog(limit_per_file: int = 2000) -> None:
 
     _write_state(state)
     if total_new_events > 0:
-        print(f"[LogReader] Total new events: {total_new_events}")
-
-if __name__ == "__main__":
-    parse_maillog()
-
-        if entries:
-            # Atomic append or just normal append? Normal append is fine for logs.
-            with open(PARSED_LOG, "a", encoding="utf-8") as out:
-                for e in entries:
-                    out.write(json.dumps(e, ensure_ascii=False) + "\n")
-            print(f"[LogReader] Found {len(entries)} new events.")
-
-        _write_state({"offset": new_offset})
-        
-    except Exception as e:
-        print(f"[LogReader] Error reading {target_log}: {e}")
+        print(f"[LogReader] Processing finished. Total new events: {total_new_events}")
 
 if __name__ == "__main__":
     parse_maillog()
