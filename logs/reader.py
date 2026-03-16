@@ -1,11 +1,12 @@
 """
-logs/reader.py – Parse Postfix and Kerio Connect logs and write structured JSON entries to logs/parsed.log.
+logs/reader.py – Parse Postfix and Kerio Connect logs. Supports file-based and journalctl-based logs.
 """
 
 import os
 import re
 import json
 import time
+import subprocess
 from typing import Optional
 
 # Paths -----------------------------------------------------------------------
@@ -14,17 +15,17 @@ PARSED_LOG = os.path.join(BASE_DIR, "logs", "parsed.log")
 STATE_FILE = os.path.join(BASE_DIR, "runtime", "reader_state.json")
 
 # Regex patterns --------------------------------------------------------------
-# Postfix
+# Postfix (Supporting standard smtpd and submission/smtpd)
 RE_SMTP = re.compile(
     r"(?P<month>\w+)\s+(?P<day>\d+)\s+(?P<time>\d+:\d+:\d+)"
-    r".*?postfix/(smtps/)?smtp\[\d+\]:\s+(?P<qid>\w+):\s+"
+    r".*?postfix/([^/]+/)?smtp\[\d+\]:\s+(?P<qid>\w+):\s+"
     r"to=<(?P<to>[^>]+)>.*?"
     r"status=(?P<status>\w+)"
 )
 
 RE_REJECT = re.compile(
     r"(?P<month>\w+)\s+(?P<day>\d+)\s+(?P<time>\d+:\d+:\d+)"
-    r".*?postfix/(smtps/)?smtpd\[\d+\]:\s+NOQUEUE: reject:.*?"
+    r".*?postfix/([^/]+/)?smtpd\[\d+\]:\s+NOQUEUE: reject:.*?"
     r"(?P<reason>[^;:]+).*?"
     r"from=<(?P<from>[^>]+)>\s+to=<(?P<to>[^>]+)>"
 )
@@ -79,134 +80,137 @@ def _parse_timestamp(month: str, day: str, t: str, year: Optional[str] = None) -
 
 def parse_maillog(limit_per_file: int = 2000) -> None:
     """
-    Read new lines from all found system mail logs and append structured JSON to parsed.log.
+    Tries to read from physical files first, falls back to journalctl if files are empty.
     """
     log_paths = [
         "/home/rescopykeriofirst/store/logs/mail.log",
         "/opt/kerio/mailserver/store/logs/mail.log",
-        "/usr/local/kerio/mailserver/store/logs/mail.log",
-        "/var/lib/kerio/mailserver/logs/mail.log",
         "/var/log/maillog", 
-        "/var/log/mail.log",
+        "/var/log/mail.log"
     ]
     
-    found_logs = [p for p in log_paths if os.path.exists(p)]
-    if not found_logs:
-        print("[LogReader] No mail log found in common paths.")
-        return
+    found_logs = [p for p in log_paths if os.path.exists(p) and os.path.getsize(p) > 0]
+    
+    if found_logs:
+        _parse_files(found_logs, limit_per_file)
+    else:
+        # Fallback to journalctl
+        _parse_journal(limit_per_file)
 
+def _parse_files(target_logs: list, limit_per_file: int) -> None:
     state = _read_state()
-    if "offsets" not in state:
-        state = {"offsets": {}}
-
-    total_new_events = 0
-
-    for target_log in found_logs:
-        print(f"[LogReader] Processing: {target_log}")
+    if "offsets" not in state: state = {"offsets": {}}
+    
+    total_new = 0
+    for path in target_logs:
+        offset = state["offsets"].get(path, 0)
+        file_size = os.path.getsize(path)
+        if file_size < offset: offset = 0
         
-        offset = state["offsets"].get(target_log)
-        if offset is None:
-            offset = 0
-            print(f"  -> Initializing offset for {target_log}")
-
-        file_size = os.path.getsize(target_log)
-        if file_size < offset:
-            print(f"  -> Log rotation detected for {target_log}, resetting to 0")
-            offset = 0
-
         entries = []
         new_offset = offset
-
         try:
-            with open(target_log, "r", errors="replace") as f:
+            with open(path, "r", errors="replace") as f:
                 f.seek(offset)
                 count = 0
                 for line in f:
                     new_offset = f.tell()
+                    entry = _parse_line(line)
+                    if entry: entries.append(entry)
                     count += 1
-                    
-                    # --- [1] POSTFIX PARSING ---
-                    m_smtp = RE_SMTP.search(line)
-                    if m_smtp:
-                        entry = {
-                            "time":     _parse_timestamp(m_smtp.group("month"), m_smtp.group("day"), m_smtp.group("time")),
-                            "qid":      m_smtp.group("qid"),
-                            "from":     "",
-                            "to":       m_smtp.group("to"),
-                            "subject":  "",
-                            "dest_ip":  "",
-                            "status":   m_smtp.group("status").lower(),
-                        }
-                        rip = RE_RELAY_IP.search(line)
-                        if rip: entry["dest_ip"] = rip.group("ip")
-                        fm = RE_FROM.search(line)
-                        if fm: entry["from"] = fm.group(1)
-                        sm = RE_SUBJ.search(line)
-                        if sm: entry["subject"] = sm.group(1).strip()
-                        entries.append(entry)
-                        continue
-
-                    m_rej = RE_REJECT.search(line)
-                    if m_rej:
-                        entry = {
-                            "time":     _parse_timestamp(m_rej.group("month"), m_rej.group("day"), m_rej.group("time")),
-                            "qid":      "REJECT",
-                            "from":     m_rej.group("from"),
-                            "to":       m_rej.group("to"),
-                            "subject":  f"Rejected: {m_rej.group('reason').strip()[:60]}",
-                            "dest_ip":  "blocked",
-                            "status":   "rejected",
-                        }
-                        entries.append(entry)
-                        continue
-
-                    # --- [2] KERIO CONNECT PARSING ---
-                    mk_sent = RE_KERIO_SENT.search(line)
-                    if mk_sent:
-                        entry = {
-                            "time":     _parse_timestamp(mk_sent.group("month"), mk_sent.group("day"), mk_sent.group("time"), mk_sent.group("year")),
-                            "qid":      mk_sent.group("qid"),
-                            "from":     "",
-                            "to":       mk_sent.group("to"),
-                            "subject":  "",
-                            "dest_ip":  "",
-                            "status":   mk_sent.group("status").lower() if mk_sent.group("status") else "sent",
-                        }
-                        entries.append(entry)
-                        continue
-
-                    mk_recv = RE_KERIO_RECV.search(line)
-                    if mk_recv:
-                        entry = {
-                            "time":     _parse_timestamp(mk_recv.group("month"), mk_recv.group("day"), mk_recv.group("time"), mk_recv.group("year")),
-                            "qid":      mk_recv.group("qid"),
-                            "from":     mk_recv.group("from"),
-                            "to":       mk_recv.group("to"),
-                            "subject":  mk_recv.group("subject").strip(),
-                            "dest_ip":  "incoming",
-                            "status":   "received",
-                        }
-                        entries.append(entry)
-                        continue
-
-                    if count >= limit_per_file:
-                        break
-
-            if entries:
-                with open(PARSED_LOG, "a", encoding="utf-8") as out:
-                    for e in entries:
-                        out.write(json.dumps(e, ensure_ascii=False) + "\n")
-                print(f"  -> Found {len(entries)} events.")
-                total_new_events += len(entries)
-
-            state["offsets"][target_log] = new_offset
+                    if count >= limit_per_file: break
             
+            if entries:
+                _save_entries(entries)
+                total_new += len(entries)
+            state["offsets"][path] = new_offset
         except Exception as e:
-            print(f"  -> Error reading {target_log}: {e}")
-
+            print(f"[LogReader] Error reading {path}: {e}")
+    
     _write_state(state)
-    if total_new_events > 0:
-        print(f"[LogReader] Processing finished. Total new events: {total_new_events}")
+    if total_new: print(f"[LogReader] Files: Found {total_new} events.")
+
+def _parse_journal(limit: int) -> None:
+    try:
+        cmd = ["journalctl", "-u", "postfix", "-n", str(limit), "--no-pager"]
+        output = subprocess.check_output(cmd, encoding="utf-8", errors="replace")
+        entries = []
+        for line in output.splitlines():
+            entry = _parse_line(line)
+            if entry: entries.append(entry)
+        
+        if entries:
+            # Simple deduplication by checking last line of parsed.log (optional)
+            _save_entries(entries)
+            print(f"[LogReader] Journal: Found {len(entries)} events.")
+    except Exception as e:
+        print(f"[LogReader] Journal error: {e}")
+
+def _parse_line(line: str) -> Optional[dict]:
+    # Postfix SMTP
+    m_smtp = RE_SMTP.search(line)
+    if m_smtp:
+        entry = {
+            "time":     _parse_timestamp(m_smtp.group("month"), m_smtp.group("day"), m_smtp.group("time")),
+            "qid":      m_smtp.group("qid"),
+            "from":     "",
+            "to":       m_smtp.group("to"),
+            "subject":  "",
+            "dest_ip":  "",
+            "status":   m_smtp.group("status").lower(),
+        }
+        rip = RE_RELAY_IP.search(line); 
+        if rip: entry["dest_ip"] = rip.group("ip")
+        fm = RE_FROM.search(line); 
+        if fm: entry["from"] = fm.group(1)
+        sm = RE_SUBJ.search(line); 
+        if sm: entry["subject"] = sm.group(1).strip()
+        return entry
+
+    # Postfix Reject
+    m_rej = RE_REJECT.search(line)
+    if m_rej:
+        return {
+            "time":     _parse_timestamp(m_rej.group("month"), m_rej.group("day"), m_rej.group("time")),
+            "qid":      "REJECT",
+            "from":     m_rej.group("from"),
+            "to":       m_rej.group("to"),
+            "subject":  f"Rejected: {m_rej.group('reason').strip()[:60]}",
+            "dest_ip":  "blocked",
+            "status":   "rejected",
+        }
+
+    # Kerio Sent
+    mk_sent = RE_KERIO_SENT.search(line)
+    if mk_sent:
+        return {
+            "time":     _parse_timestamp(mk_sent.group("month"), mk_sent.group("day"), mk_sent.group("time"), mk_sent.group("year")),
+            "qid":      mk_sent.group("qid"),
+            "from":     "",
+            "to":       mk_sent.group("to"),
+            "subject":  "",
+            "dest_ip":  "",
+            "status":   mk_sent.group("status").lower() if mk_sent.group("status") else "sent",
+        }
+
+    # Kerio Recv
+    mk_recv = RE_KERIO_RECV.search(line)
+    if mk_recv:
+        return {
+            "time":     _parse_timestamp(mk_recv.group("month"), mk_recv.group("day"), mk_recv.group("time"), mk_recv.group("year")),
+            "qid":      mk_recv.group("qid"),
+            "from":     mk_recv.group("from"),
+            "to":       mk_recv.group("to"),
+            "subject":  mk_recv.group("subject").strip(),
+            "dest_ip":  "incoming",
+            "status":   "received",
+        }
+    return None
+
+def _save_entries(entries: list) -> None:
+    with open(PARSED_LOG, "a", encoding="utf-8") as out:
+        for e in entries:
+            out.write(json.dumps(e, ensure_ascii=False) + "\n")
 
 if __name__ == "__main__":
     parse_maillog()
