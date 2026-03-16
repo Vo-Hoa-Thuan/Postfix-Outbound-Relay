@@ -67,6 +67,24 @@
         </div>
 
         <div class="section-header" style="grid-column: 1 / -1; margin-top: 20px;">
+            <!-- ── Postfix Global Identity ───────────────────────────────────── -->
+            <h3>Postfix Global Identity</h3>
+        </div>
+        <div class="card mt-2" style="grid-column: 1 / -1;">
+            <p class="muted small mb-1">Set the primary hostname and domain for the mail server. This is used in HELO/EHLO and SPF/DKIM validation.</p>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>My Hostname (myhostname)</label>
+                    <input type="text" name="myhostname" value="{{ postfix_identity.myhostname }}" placeholder="mail.yourdomain.com" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>My Domain (mydomain)</label>
+                    <input type="text" name="mydomain" value="{{ postfix_identity.mydomain }}" placeholder="yourdomain.com" class="form-input">
+                </div>
+            </div>
+        </div>
+
+        <div class="section-header" style="grid-column: 1 / -1; margin-top: 20px;">
             <h3>Postfix Relay Limits</h3>
         </div>
 

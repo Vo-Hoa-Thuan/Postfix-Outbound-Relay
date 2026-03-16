@@ -121,6 +121,29 @@ def apply_postfix_limits(limits: Dict[str, str]) -> Tuple[bool, str]:
         return False, str(e)
 
 
+def get_postfix_identity() -> Dict[str, str]:
+    """Read myhostname and mydomain from Postfix."""
+    identity = {"myhostname": "localhost", "mydomain": "local"}
+    for key in identity.keys():
+        ok, out = run_command(f"postconf -h {key}")
+        if ok and out:
+            identity[key] = out.strip()
+    return identity
+
+def apply_postfix_identity(hostname: str, domain: str) -> Tuple[bool, str]:
+    """Apply myhostname and mydomain to Postfix."""
+    try:
+        if hostname: run_command(f"postconf -e 'myhostname={hostname}'")
+        if domain:   run_command(f"postconf -e 'mydomain={domain}'")
+        
+        ok, out = safe_reload_postfix()
+        if not ok:
+            return False, f"Failed to reload Postfix: {out}"
+        return True, "Postfix identity updated and service reloaded."
+    except Exception as e:
+        return False, str(e)
+
+
 # ── Internal helpers ─────────────────────────────────────────────────────────
 
 def _run(cmd: str) -> Tuple[bool, str]:
