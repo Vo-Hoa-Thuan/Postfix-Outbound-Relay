@@ -100,6 +100,19 @@ def safe_reload_rspamd() -> Tuple[bool, str]:
     # Rspamd can be reloaded via systemctl or rspamadm
     return run_command("systemctl reload rspamd")
 
+def get_local_ips() -> list:
+    """Returns a list of all IP addresses assigned to this machine."""
+    ok, out = run_command("hostname -I")
+    if ok and out:
+        return out.split()
+    return ["127.0.0.1"]
+
+def is_ip_local(ip: str) -> bool:
+    """Checks if the given IP address is assigned to a local interface."""
+    if not ip or ip == "127.0.0.1":
+        return True
+    return ip.strip() in get_local_ips()
+
 def rollback_config(path: str, backup_path: str) -> Tuple[bool, str]:
     """Restores a backup to the original path."""
     try:

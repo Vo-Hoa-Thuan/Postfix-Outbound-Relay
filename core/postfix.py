@@ -72,6 +72,10 @@ def sync_transport(active_ip: str) -> Tuple[bool, str]:
             msg = f"SASL Auth enabled for smarthost [{active_ip}] and Postfix reloaded."
         else:
             # --- Local Bind Mode ---
+            from core.system_safe import is_ip_local
+            if not is_ip_local(active_ip):
+                return False, f"IP {active_ip} is NOT assigned to this VPS. Binding failed for safety."
+
             _run(f"postconf -e 'smtp_bind_address={active_ip}'")
             _run("postconf -e 'relayhost='") # clear smarthost
             _run("postconf -e 'smtp_sasl_auth_enable=no'")
