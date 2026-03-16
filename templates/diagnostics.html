@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% set active_page = "diagnostics" %}
+
+{% block title %}Diagnostics – Postfix Relay Panel{% endblock %}
+{% block page_title %}Diagnostic Tools{% endblock %}
+
+{% block content %}
+
+<div class="layout-2col">
+
+    <!-- ── SMTP Test Tool ────────────────────────────────────────────── -->
+    <div class="card">
+        <h2 class="card-title">🚀 SMTP Test Tool</h2>
+        <p class="muted small mb-2">Send a real test email through the local Postfix relay (127.0.0.1:25) to verify IP rotation and Rspamd filtering.</p>
+        
+        <form action="/diagnostics/send-test" method="post" class="form-stack">
+            <div class="form-group">
+                <label>Recipient Email</label>
+                <input type="email" name="recipient" required placeholder="your-email@example.com" class="form-input" />
+            </div>
+            <div class="form-group">
+                <label>Sender Address (From)</label>
+                <input type="text" name="sender" value="test@relay.local" class="form-input" />
+            </div>
+            <div class="form-group">
+                <label>Subject</label>
+                <input type="text" name="subject" value="SMTP Relay Test Message" class="form-input" />
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Send Test Email</button>
+            </div>
+        </form>
+
+        {% if request.query_params.get('msg_id') %}
+        <div id="trace-panel" class="mt-2" style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #3498db;">
+            <h3 style="font-size: 1rem; margin-bottom: 10px;">🔍 Real-Time Trace</h3>
+            <p class="small mono">Target Message-ID: <span id="trace-msg-id">{{ request.query_params.get('msg_id') }}</span></p>
+            <div id="trace-results" class="mono small" style="max-height: 200px; overflow-y: auto; background: #fff; padding: 10px; border: 1px solid #eee;">
+                Polling logs...
+            </div>
+            <button onclick="pollTrace()" class="btn btn-xs btn-secondary mt-1">Refresh Trace</button>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ── Queue & Tracking ─────────────────────────────────────────── -->
+    <div>
+        <div class="card stat-card">
+            <div class="stat-label">Postfix Queue Summary</div>
+            <div class="stat-value" style="font-size: 1.2rem;">{{ queue.summary }}</div>
+            <form action="/diagnostics/queue/flush" method="post" class="mt-1">
+                <button type="submit" class="btn btn-xs btn-danger">Flush Queue</button>
+            </form>
+        </div>
+
+        <div class="card mt-2">
+            <h3 class="card-title">Log Tracking Tips</h3>
+            <ul class="muted small" style="line-height: 1.6;">
+                <li>The panel parses <code>mail.log</code> and <code>journalctl</code>.</li>
+                <li>Delivery "sent" means the remote server accepted the mail.</li>
+                <li>"deferred" means temporary failure (retry later).</li>
+                <li>"bounced" means permanent rejection.</li>
+            </ul>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function pollTrace() {
+        const msgId = document.getElementById('trace-msg-id').textContent;
+        const results = document.getElementById('trace-results');
+        
+        try {
+            const response = await fetch('/diagnostics/trace/' + msgId);
+            const data = await response.json();
+            
+            if (data.length === 0) {
+                results.innerHTML = '<span class="muted">No logs found yet. Waiting for Postfix...</span>';
+                return;
+            }
+            
+            results.innerHTML = data.map(ev => {
+                if (ev.error) return `<div class="text-danger">Error: ${ev.error}</div>`;
+                if (ev.raw) return `<div>${ev.raw}</div>`;
+                return `<div><span class="text-blue">[${ev.time}]</span> <b>${ev.qid}</b>: ${ev.info}</div>`;
+            }).join('');
+            
+        } catch (err) {
+            results.textContent = 'Failed to fetch trace data.';
+        }
+    }
+
+    // Auto-poll if we just sent a test
+    if (document.getElementById('trace-msg-id')) {
+        pollTrace();
+        setInterval(pollTrace, 5000); // Every 5s
+    }
+</script>
+<style>
+    .text-blue { color: #3498db; }
+    .text-danger { color: #e74c3c; }
+    .mb-2 { margin-bottom: 20px; }
+</style>
+{% endblock %}

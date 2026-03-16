@@ -174,19 +174,29 @@ async def toggle_ip(ip: str = Form(...)):
 
 
 @router.post("/check-blacklist")
-async def check_ip_blacklist_route(ip: str = Form(...)):
+async def check_ip_blacklist_route(ip: str = Form(...), force: bool = Form(False)):
     from core.blacklist import process_ip_blacklist_alert
-    is_bad = process_ip_blacklist_alert(ip)
-    if is_bad:
-        return RedirectResponse(f"/ips?error=WARNING:+{ip}+is+BLACKLISTED!+It+has+been+automatically+disabled.", status_code=303)
+    result = process_ip_blacklist_alert(ip, force_refresh=force)
+    
+    status = result.get("status", "UNKNOWN")
+    if result.get("is_blacklisted"):
+        return RedirectResponse(f"/ips?error=WARNING:+{ip}+is+BLACKLISTED!+Status:+{status}", status_code=303)
     else:
-        return RedirectResponse(f"/ips?msg={ip}+is+clean+(Not+blacklisted).", status_code=303)
+        return RedirectResponse(f"/ips?msg={ip}+is+{status}.", status_code=303)
 
 @router.post("/check-all-blacklist")
-async def check_all_blacklist_route():
-    from core.blacklist import auto_check_all
-    # We'll force a check by modifying the last_check time if needed, 
-    # but auto_check_all usually has a 12h threshold. 
-    # Let's import and call a version that forces it or just call it.
-    auto_check_all() 
-    return RedirectResponse("/ips?msg=Background+blacklist+check+started+for+all+IPs.", status_code=303)
+async def check_all_blacklist_route(force: bool = Form(False)):
+    from core.blacklist import process_ip_blacklist_alert
+    data = _read_ips()
+    for ip_entry in data.get("ips", []):
+        if ip_entry.get("enabled", True):
+            process_ip_blacklist_alert(ip_entry.get("ip"), force_refresh=force)
+            
+    return RedirectResponse("/ips?msg=Blacklist+check+completed+for+all+enabled+IPs.", status_code=303)
+
+@router.get("/status/{ip}")
+async def get_ip_status(ip: str):
+    """API for AJAX status updates."""
+    from core.blacklist import check_ip_blacklist
+    # Use cache by default for status polling
+    return check_ip_blacklist(ip, force_refresh=False)

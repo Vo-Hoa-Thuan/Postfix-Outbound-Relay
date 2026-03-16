@@ -91,23 +91,45 @@ def sync_transport(active_ip: str) -> Tuple[bool, str]:
         return False, str(e)
 
 
-# ── Internal helpers ─────────────────────────────────────────────────────────
+from core.system_safe import run_command, safe_reload_postfix
 
-def _run(cmd: str) -> Tuple[bool, str]:
+def get_postfix_limits() -> Dict[str, str]:
+    """Read current Postfix limits using postconf."""
+    limits = {
+        "smtpd_recipient_limit": "1000",
+        "message_size_limit": "10240000",
+        "default_destination_concurrency_limit": "20",
+        "default_destination_recipient_limit": "50"
+    }
+    for key in limits.keys():
+        ok, out = run_command(f"postconf -h {key}")
+        if ok and out:
+            limits[key] = out.strip()
+    return limits
+
+def apply_postfix_limits(limits: Dict[str, str]) -> Tuple[bool, str]:
+    """Apply Postfix limits using postconf -e."""
     try:
-        result = subprocess.run(
-            cmd, shell=True, capture_output=True, text=True, timeout=15
-        )
-        out = (result.stdout + result.stderr).strip()
-        return result.returncode == 0, out
-    except FileNotFoundError:
-        return False, f"Command not found: {cmd} (expected Linux environment)"
+        for key, val in limits.items():
+            run_command(f"postconf -e '{key}={val}'")
+        
+        ok, out = safe_reload_postfix()
+        if not ok:
+            return False, f"Failed to reload Postfix: {out}"
+        return True, "Postfix limits updated and service reloaded."
     except Exception as e:
         return False, str(e)
 
 
+# ── Internal helpers ─────────────────────────────────────────────────────────
+
+def _run(cmd: str) -> Tuple[bool, str]:
+    """Internal runner using system_safe helper."""
+    return run_command(cmd)
+
+
 def _service_status(service: str) -> str:
-    ok, out = _run(f"systemctl is-active {service}")
+    ok, out = run_command(f"systemctl is-active {service}")
     if ok and out.strip() == "active":
         return "running"
     return "stopped"

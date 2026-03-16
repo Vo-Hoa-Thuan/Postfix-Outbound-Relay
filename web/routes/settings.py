@@ -16,10 +16,13 @@ router = APIRouter(prefix="/settings")
 
 @router.get("", response_class=HTMLResponse)
 async def view_settings(request: Request, msg: str = "", error: str = ""):
+    from core.postfix import get_postfix_limits
     settings = get_settings()
+    postfix_limits = get_postfix_limits()
     return templates.TemplateResponse("settings.html", {
         "request": request,
         "settings": settings,
+        "postfix_limits": postfix_limits,
         "msg": msg,
         "error": error
     })
@@ -35,7 +38,12 @@ async def save_settings_post(
     smtp_pass: str = Form(""),
     from_email: str = Form(""),
     to_email: str = Form(""),
-    blacklist_check_interval: int = Form(12)
+    blacklist_check_interval: int = Form(12),
+    # Postfix Limits
+    recipient_limit: int = Form(1000),
+    message_size: int = Form(10240000),
+    dest_concurrency: int = Form(20),
+    dest_recipient_limit: int = Form(50)
 ):
     settings = get_settings()
     settings["mxtoolbox_api_key"] = mxtoolbox_api_key.strip()
@@ -53,7 +61,22 @@ async def save_settings_post(
     settings["blacklist_check_interval"] = max(1, blacklist_check_interval)
     
     save_settings(settings)
-    return RedirectResponse("/settings?msg=Settings+saved+successfully", status_code=303)
+
+    # Apply Postfix Limits
+    from core.postfix import apply_postfix_limits
+    postfix_cfg = {
+        "smtpd_recipient_limit": str(recipient_limit),
+        "message_size_limit": str(message_size),
+        "default_destination_concurrency_limit": str(dest_concurrency),
+        "default_destination_recipient_limit": str(dest_recipient_limit)
+    }
+    ok, p_msg = apply_postfix_limits(postfix_cfg)
+    
+    msg = "Settings saved successfully"
+    if not ok:
+        return RedirectResponse(f"/settings?msg={msg}&error={p_msg}", status_code=303)
+        
+    return RedirectResponse(f"/settings?msg={msg}+and+Postfix limits+applied", status_code=303)
 
 @router.post("/test-email")
 async def test_email_post(request: Request):

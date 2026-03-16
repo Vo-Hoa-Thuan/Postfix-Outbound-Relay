@@ -1,23 +1,51 @@
 """
-core/blacklist.py - Check IP Blacklist status using MXToolbox API.
+core/blacklist.py - Check IP Blacklist status using MXToolbox API with 24h caching.
 """
 import urllib.request
 import urllib.error
 import urllib.parse
 import json
+import time
+import os
+from typing import Dict, Any, List
 
 from core.settings import get_settings, send_alert
+from core.fileio import read_json, write_json
 
-def check_ip_blacklist(ip_address: str) -> dict:
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CACHE_FILE = os.path.join(BASE_DIR, "runtime", "blacklist_cache.json")
+RELAY_IPS_FILE = os.path.join(BASE_DIR, "config", "relay_ips.json")
+
+def check_ip_blacklist(ip_address: str, force_refresh: bool = False) -> Dict[str, Any]:
     """
-    Checks an IP against MXToolbox Blacklist API.
-    Returns a dict with 'is_blacklisted' boolean and 'details' list.
+    Checks an IP against MXToolbox Blacklist API with 24h caching.
+    Returns normalized status: CLEAN, BLACKLISTED, ERROR, CACHED.
     """
+    now = time.time()
+    cache = read_json(CACHE_FILE, {})
+    
+    # Check cache (24 hours = 86400 seconds)
+    cached_result = cache.get(ip_address)
+    if not force_refresh and cached_result:
+        cache_age = now - cached_result.get("checked_at", 0)
+        if cache_age < 86400:
+            cached_result["status"] = "CACHED"
+            cached_result["cache_age_seconds"] = int(cache_age)
+            return cached_result
+
+    # Real check logic
     settings = get_settings()
     api_key = settings.get("mxtoolbox_api_key", "").strip()
     
     if not api_key:
-        return {"error": "MXToolbox API Key not configured.", "is_blacklisted": False, "details": []}
+        return {
+            "ip": ip_address,
+            "status": "ERROR",
+            "error": "MXToolbox API Key not configured.",
+            "is_blacklisted": False,
+            "blacklists": [],
+            "checked_at": now
+        }
         
     url = f"https://api.mxtoolbox.com/api/v1/lookup/blacklist/{urllib.parse.quote(ip_address)}"
     
@@ -30,101 +58,102 @@ def check_ip_blacklist(ip_address: str) -> dict:
         with urllib.request.urlopen(req, timeout=15) as response:
             data = json.loads(response.read().decode())
             
-            # Find blacklisted entries
             failed_checks = [
-                info for info in data.get("Failed", [])
+                info.get("Name", "Unknown") for info in data.get("Failed", [])
                 if info.get("IsBlacklisted", False)
             ]
             
             is_blacklisted = len(failed_checks) > 0
             
-            return {
+            result = {
+                "ip": ip_address,
+                "status": "BLACKLISTED" if is_blacklisted else "CLEAN",
                 "is_blacklisted": is_blacklisted,
-                "details": failed_checks
+                "blacklists": failed_checks,
+                "checked_at": now,
+                "source": "MXToolbox"
             }
             
+            # Update cache
+            cache[ip_address] = result
+            write_json(CACHE_FILE, cache)
+            
+            return result
+            
+    except urllib.error.HTTPError as e:
+        if e.code == 403: error_msg = "API Key Invalid or Quota Exceeded (403)"
+        elif e.code == 429: error_msg = "Rate limit exceeded (429)"
+        else: error_msg = f"HTTP Error {e.code}"
     except urllib.error.URLError as e:
-        print(f"Failed to check MXToolbox for {ip_address}: {e}")
-        return {"error": str(e), "is_blacklisted": False, "details": []}
+        error_msg = f"Network Error: {e.reason}"
     except Exception as e:
-        print(f"Unexpected error checking MXToolbox for {ip_address}: {e}")
-        return {"error": str(e), "is_blacklisted": False, "details": []}
+        error_msg = f"Unexpected Error: {str(e)}"
 
-def process_ip_blacklist_alert(ip_address: str):
+    # If error occurred, return whatever we have in cache if it exists, otherwise return error
+    if cached_result:
+        cached_result["status"] = "CACHED (STALE)"
+        cached_result["error_note"] = error_msg
+        return cached_result
+        
+    return {
+        "ip": ip_address,
+        "status": "ERROR",
+        "error": error_msg,
+        "is_blacklisted": False,
+        "blacklists": [],
+        "checked_at": now
+    }
+
+def process_ip_blacklist_alert(ip_address: str, force_refresh: bool = False):
     """
-    Checks an IP, and if it is blacklisted, disables it and sends an email alert.
-    Returns True if an action was taken (blacklisted), False otherwise.
+    Checks an IP and automates disabling/alerting.
     """
-    from core.fileio import read_json, write_json
-    import os
+    result = check_ip_blacklist(ip_address, force_refresh=force_refresh)
     
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    RELAY_IPS_FILE = os.path.join(BASE_DIR, "config", "relay_ips.json")
-    
-    result = check_ip_blacklist(ip_address)
-    
-    # Always update last check timestamp
-    import time
+    # Update relay_ips.json with latest check info
     config = read_json(RELAY_IPS_FILE, {"ips": []})
     modified = False
+    
     for ip_data in config.get("ips", []):
         if ip_data.get("ip") == ip_address:
-            ip_data["last_blacklist_check"] = time.time()
+            ip_data["last_blacklist_check"] = result.get("checked_at")
+            ip_data["blacklist_status"] = result.get("status")
             modified = True
             
             if result.get("is_blacklisted"):
-                # IP is on a blacklist!
-                details = result.get("details", [])
-                reasons = ", ".join([d.get("Name", "Unknown") for d in details])
+                reasons = ", ".join(result.get("blacklists", []))
                 
-                # Disable the IP in configuration
                 if ip_data.get("enabled", True):
                     ip_data["enabled"] = False
                     ip_data["note"] = f"(BLACKLISTED on {reasons}) " + ip_data.get("note", "")
                     
-                    # Send Alert
-                    alert_msg = f"CRITICAL: IP Address {ip_address} has been blacklisted!\n\n" \
-                                f"Detected on the following blacklists:\n{reasons}\n\n" \
-                                f"Action Taken: The system has automatically DISABLED this IP to protect your sender reputation."
+                    alert_msg = f"CRITICAL: IP {ip_address} BLACKLISTED!\n\n" \
+                                f"Lists: {reasons}\n" \
+                                f"Action: System has automatically DISABLED this IP."
                     send_alert(f"IP {ip_address} BLACKLISTED!", alert_msg)
             break
                 
     if modified:
         write_json(RELAY_IPS_FILE, config)
         
-    return result.get("is_blacklisted", False)
+    return result
 
 def auto_check_all():
-    """
-    Checks all enabled IPs in the background. Should be called periodically.
-    """
-    from core.fileio import read_json, write_json
-    import os
-    import time
-    
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    RELAY_IPS_FILE = os.path.join(BASE_DIR, "config", "relay_ips.json")
-    LAST_CHECK_FILE = os.path.join(BASE_DIR, "runtime", "last_blacklist_check.json")
-    
-    # Get interval from settings (default 12 hours)
+    """Background loop entry point."""
     settings = get_settings()
     interval_hours = settings.get("blacklist_check_interval", 12)
-    interval_seconds = interval_hours * 3600
     
-    # Check max once every configured interval hours to save API calls
+    LAST_CHECK_FILE = os.path.join(BASE_DIR, "runtime", "last_auto_check.json")
     last_check_data = read_json(LAST_CHECK_FILE, {"last_check": 0})
-    now = time.time()
     
-    if now - last_check_data.get("last_check", 0) < interval_seconds:
+    if time.time() - last_check_data.get("last_check", 0) < (interval_hours * 3600):
         return
         
     config = read_json(RELAY_IPS_FILE, {"ips": []})
-    
     for ip_data in config.get("ips", []):
         if ip_data.get("enabled", True):
-            # Check and alert/disable if needed
             process_ip_blacklist_alert(ip_data.get("ip"))
-            time.sleep(2) # rate limiting for MXToolbox
+            time.sleep(2) # be nice to API
             
-    write_json(LAST_CHECK_FILE, {"last_check": now})
+    write_json(LAST_CHECK_FILE, {"last_check": time.time()})
 

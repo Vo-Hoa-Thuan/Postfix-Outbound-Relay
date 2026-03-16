@@ -66,8 +66,36 @@
             <input type="email" name="to_email" value="{{ settings.alert_email.to_email }}" class="form-input" />
         </div>
 
-        <div class="form-actions" style="grid-column: 1 / -1; justify-content: flex-start; gap: 10px;">
-            <button type="submit" class="btn btn-primary">Save Settings</button>
+        <div class="section-header" style="grid-column: 1 / -1; margin-top: 20px;">
+            <h3>Postfix Relay Limits</h3>
+        </div>
+
+        <div class="form-group">
+            <label>SMTPD Recipient Limit</label>
+            <input type="number" name="recipient_limit" value="{{ postfix_limits.smtpd_recipient_limit }}" class="form-input" />
+            <small class="muted">Max recipients per message.</small>
+        </div>
+
+        <div class="form-group">
+            <label>Message Size Limit (Bytes)</label>
+            <input type="number" name="message_size" value="{{ postfix_limits.message_size_limit }}" class="form-input" />
+            <small class="muted">Max size of a single email.</small>
+        </div>
+
+        <div class="form-group">
+            <label>Destination Concurrency</label>
+            <input type="number" name="dest_concurrency" value="{{ postfix_limits.default_destination_concurrency_limit }}" class="form-input" />
+            <small class="muted">Concurrent connections to same domain.</small>
+        </div>
+
+        <div class="form-group">
+            <label>Destination Recipient Limit</label>
+            <input type="number" name="dest_recipient_limit" value="{{ postfix_limits.default_destination_recipient_limit }}" class="form-input" />
+            <small class="muted">Recipients per connection to same domain.</small>
+        </div>
+
+        <div class="form-actions" style="grid-column: 1 / -1; justify-content: flex-start; gap: 10px; margin-top: 20px;">
+            <button type="submit" class="btn btn-primary">Save All Settings</button>
         </div>
     </form>
     
