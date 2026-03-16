@@ -33,6 +33,19 @@ RE_RELAY_IP = re.compile(r"relay=[^[]+\[(?P<ip>\d+\.\d+\.\d+\.\d+)\]")
 RE_FROM     = re.compile(r"from=<([^>]+)>")
 RE_SUBJ     = re.compile(r"subject=([^,\n]+)")
 
+# Regex patterns for Kerio Connect --------------------------------------------
+RE_KERIO_SENT = re.compile(
+    r"\[(?P<day>\d+)/(?P<month>\w+)/(?P<year>\d+)\s+(?P<time>\d+:\d+:\d+)\]\s+"
+    r"Sent:\s+Queue-ID:\s+(?P<qid>[^,]+),\s+Recipient:\s+<(?P<to>[^>]+)>,\s+"
+    r"Result:\s+(?P<result>[^,]+),\s+Status:\s+(?P<status>[^,]+)"
+)
+
+RE_KERIO_RECV = re.compile(
+    r"\[(?P<day>\d+)/(?P<month>\w+)/(?P<year>\d+)\s+(?P<time>\d+:\d+:\d+)\]\s+"
+    r"Recv:\s+Queue-ID:\s+(?P<qid>[^,]+),.*?From:\s+<(?P<from>[^>]+)>,\s+To:\s+<(?P<to>[^>]+)>.*?"
+    r"Subject:\s+(?P<subject>[^,]+)"
+)
+
 MONTH_MAP = {
     "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
     "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12,
@@ -58,19 +71,31 @@ def _write_state(state: dict) -> None:
 def _current_year() -> int:
     return time.localtime().tm_year
 
-def _parse_timestamp(month: str, day: str, t: str) -> str:
+from typing import Optional
+
+def _parse_timestamp(month: str, day: str, t: str, year: Optional[str] = None) -> str:
     m = MONTH_MAP.get(month, 1)
-    return f"{_current_year()}-{m:02d}-{int(day):02d} {t}"
+    y = year if year else _current_year()
+    return f"{y}-{m:02d}-{int(day):02d} {t}"
 
 def parse_maillog(limit: int = 2000) -> None:
     """
     Read new lines from system mail logs and append structured JSON to parsed.log.
     """
-    log_paths = ["/var/log/maillog", "/var/log/mail.log"]
+    # Search common log locations (Postfix & Kerio)
+    log_paths = [
+        "/var/log/maillog", 
+        "/var/log/mail.log",
+        "/opt/kerio/mailserver/store/logs/mail.log",
+        "/usr/local/kerio/mailserver/store/logs/mail.log",
+        "/var/lib/kerio/mailserver/logs/mail.log"
+    ]
     target_log = None
     for p in log_paths:
         if os.path.exists(p):
             target_log = p
+            # In case multiple exist, we might want to track which one we use or parse all.
+            # For now, let's just pick the first one that exists.
             break
             
     if not target_log:
@@ -80,11 +105,9 @@ def parse_maillog(limit: int = 2000) -> None:
     offset = state.get("offset")
     
     # If this is the VERY first time running (no state), start from the END
-    # to avoid parsing potentially gigabytes of old logs.
     if offset is None:
         try:
             offset = os.path.getsize(target_log)
-            print(f"[LogReader] First run, starting from offset {offset} of {target_log}")
             _write_state({"offset": offset})
             return
         except Exception:
@@ -93,7 +116,6 @@ def parse_maillog(limit: int = 2000) -> None:
     # If log rotated (current log smaller than offset), reset to 0
     try:
         if os.path.getsize(target_log) < offset:
-            print(f"[LogReader] Log rotation detected for {target_log}, resetting offset.")
             offset = 0
     except Exception:
         offset = 0
@@ -109,7 +131,7 @@ def parse_maillog(limit: int = 2000) -> None:
                 new_offset = f.tell()
                 count += 1
                 
-                # 1. Match standard SMTP delivery
+                # --- [1] POSTFIX PARSING ---
                 m_smtp = RE_SMTP.search(line)
                 if m_smtp:
                     entry = {
@@ -121,32 +143,57 @@ def parse_maillog(limit: int = 2000) -> None:
                         "dest_ip":  "",
                         "status":   m_smtp.group("status").lower(),
                     }
-                    
                     rip = RE_RELAY_IP.search(line)
                     if rip: entry["dest_ip"] = rip.group("ip")
-                    
                     fm = RE_FROM.search(line)
                     if fm: entry["from"] = fm.group(1)
-                    
                     sm = RE_SUBJ.search(line)
                     if sm: entry["subject"] = sm.group(1).strip()
-                    
                     entries.append(entry)
-                
-                # 2. Match Inbound Rejects
-                else:
-                    m_rej = RE_REJECT.search(line)
-                    if m_rej:
-                        entry = {
-                            "time":     _parse_timestamp(m_rej.group("month"), m_rej.group("day"), m_rej.group("time")),
-                            "qid":      "REJECT",
-                            "from":     m_rej.group("from"),
-                            "to":       m_rej.group("to"),
-                            "subject":  f"Rejected: {m_rej.group('reason').strip()[:60]}",
-                            "dest_ip":  "blocked",
-                            "status":   "rejected",
-                        }
-                        entries.append(entry)
+                    continue
+
+                m_rej = RE_REJECT.search(line)
+                if m_rej:
+                    entry = {
+                        "time":     _parse_timestamp(m_rej.group("month"), m_rej.group("day"), m_rej.group("time")),
+                        "qid":      "REJECT",
+                        "from":     m_rej.group("from"),
+                        "to":       m_rej.group("to"),
+                        "subject":  f"Rejected: {m_rej.group('reason').strip()[:60]}",
+                        "dest_ip":  "blocked",
+                        "status":   "rejected",
+                    }
+                    entries.append(entry)
+                    continue
+
+                # --- [2] KERIO CONNECT PARSING ---
+                mk_sent = RE_KERIO_SENT.search(line)
+                if mk_sent:
+                    entry = {
+                        "time":     _parse_timestamp(mk_sent.group("month"), mk_sent.group("day"), mk_sent.group("time"), mk_sent.group("year")),
+                        "qid":      mk_sent.group("qid"),
+                        "from":     "", # Recv line has 'from'
+                        "to":       mk_sent.group("to"),
+                        "subject":  "", # Recv line has 'subject'
+                        "dest_ip":  "",
+                        "status":   mk_sent.group("status").lower() if mk_sent.group("status") else "sent",
+                    }
+                    entries.append(entry)
+                    continue
+
+                mk_recv = RE_KERIO_RECV.search(line)
+                if mk_recv:
+                    entry = {
+                        "time":     _parse_timestamp(mk_recv.group("month"), mk_recv.group("day"), mk_recv.group("time"), mk_recv.group("year")),
+                        "qid":      mk_recv.group("qid"),
+                        "from":     mk_recv.group("from"),
+                        "to":       mk_recv.group("to"),
+                        "subject":  mk_recv.group("subject").strip(),
+                        "dest_ip":  "incoming",
+                        "status":   "received",
+                    }
+                    entries.append(entry)
+                    continue
 
                 if count >= limit:
                     break
