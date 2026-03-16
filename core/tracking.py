@@ -1,6 +1,7 @@
 """
 core/tracking.py – Parse Postfix logs to track message status.
 """
+import os
 import subprocess
 import re
 from typing import List, Dict, Optional, Any
@@ -11,18 +12,38 @@ POSTFIX_LOG_RE = re.compile(r"(\w{3}\s+\d+\s+[\d:]+)\s+\S+\s+postfix/(\w+)\[\d+\
 
 def get_message_history(msg_id_snippet: str, limit: int = 50) -> List[Dict[str, str]]:
     """
-    Searches journalctl or mail.log for a specific Message-ID snippet or Queue ID.
+    Searches logs for a specific Message-ID/Queue ID.
+    If a Queue ID is found for a Message-ID, it traces the entire lifecycle.
     """
     events = []
     try:
-        # Use journalctl for modern systems, fallback to tailing mail.log
-        cmd = f"journalctl -u postfix --since '1 hour ago' | grep '{msg_id_snippet}' | tail -n {limit}"
-        res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
+        # Step 1: Find the first occurrence to resolve Queue ID if we only have Message-ID
+        # We search the last hour of logs
+        cmd_base = ""
+        if os.name != 'nt':
+            if subprocess.run("which journalctl", shell=True, capture_output=True).returncode == 0:
+                cmd_base = "journalctl -u postfix --since '1 hour ago'"
+            elif os.path.exists("/var/log/mail.log"):
+                cmd_base = "cat /var/log/mail.log"
         
-        if not res.stdout.strip():
-            # Fallback to /var/log/mail.log if journalctl empty
-            cmd = f"grep '{msg_id_snippet}' /var/log/mail.log | tail -n {limit}"
-            res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
+        if not cmd_base:
+            return [{"error": "Unsupported environment for log tracking"}]
+
+        # Try to find the Queue ID first
+        find_qid_cmd = f"{cmd_base} | grep '{msg_id_snippet}' | head -n 1"
+        res = subprocess.run(find_qid_cmd, shell=True, capture_output=True, text=True, timeout=5)
+        
+        search_term = msg_id_snippet
+        first_line = res.stdout.strip()
+        if first_line:
+            match = POSTFIX_LOG_RE.search(first_line)
+            if match:
+                # Groups: timestamp, component, qid, rest
+                search_term = match.group(3) # Use the Queue ID for a full trace
+
+        # Step 2: Get all lines for that search_term (Queue ID)
+        trace_cmd = f"{cmd_base} | grep '{search_term}' | tail -n {limit}"
+        res = subprocess.run(trace_cmd, shell=True, capture_output=True, text=True, timeout=10)
 
         for line in res.stdout.splitlines():
             line = line.strip()
