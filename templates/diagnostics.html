@@ -13,6 +13,14 @@
         <h2 class="card-title">🚀 SMTP Test Tool</h2>
         <p class="muted small mb-2">Send a real test email through the local Postfix relay (127.0.0.1:25) to verify IP rotation and Rspamd filtering.</p>
         
+        {% if identity.mydomain == "local" or identity.myhostname == "localhost" %}
+        <div class="flash-error small" style="padding: 10px; margin-bottom: 15px;">
+            ⚠️ <b>Warning:</b> Postfix is still using default identity (localhost). 
+            External providers like Gmail will block your mail. 
+            Please set a real domain in <b>Settings</b>.
+        </div>
+        {% endif %}
+
         <form action="/diagnostics/send-test" method="post" class="form-stack">
             <div class="form-group">
                 <label>Recipient Email</label>
@@ -20,7 +28,8 @@
             </div>
             <div class="form-group">
                 <label>Sender Address (From)</label>
-                <input type="text" name="sender" value="test@relay.local" class="form-input" />
+                <input type="text" name="sender" value="test@{{ identity.mydomain }}" class="form-input" />
+                <span class="small muted">Make sure your domain has SPF records for IP: <b>45.122.223.116</b></span>
             </div>
             <div class="form-group">
                 <label>Subject</label>

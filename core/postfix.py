@@ -144,6 +144,30 @@ def apply_postfix_identity(hostname: str, domain: str) -> Tuple[bool, str]:
         return False, str(e)
 
 
+def get_mynetworks() -> str:
+    """Read current mynetworks from Postfix."""
+    ok, out = run_command("postconf -h mynetworks")
+    if ok and out:
+        return out.strip()
+    return "127.0.0.0/8"
+
+def apply_mynetworks(networks_str: str) -> Tuple[bool, str]:
+    """Apply mynetworks to Postfix."""
+    try:
+        # Basic validation: ensure 127.0.0.0/8 is always included for safety
+        if "127.0.0.0/8" not in networks_str:
+            networks_str = "127.0.0.0/8 " + networks_str
+            
+        run_command(f"postconf -e 'mynetworks={networks_str.strip()}'")
+        
+        ok, out = safe_reload_postfix()
+        if not ok:
+            return False, f"Failed to reload Postfix: {out}"
+        return True, "Trusted Relay IPs updated and service reloaded."
+    except Exception as e:
+        return False, str(e)
+
+
 # ── Internal helpers ─────────────────────────────────────────────────────────
 
 def _run(cmd: str) -> Tuple[bool, str]:

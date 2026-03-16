@@ -85,8 +85,20 @@
         </div>
 
         <div class="section-header" style="grid-column: 1 / -1; margin-top: 20px;">
-            <h3>Postfix Relay Limits</h3>
+            <!-- ── Relay Access Control ────────────────────────────────────── -->
+            <h3>Relay Access Control</h3>
         </div>
+        <div class="card mt-2" style="grid-column: 1 / -1;">
+            <p class="muted small mb-1">List of IP addresses or CIDR networks that are allowed to relay mail through this server without authentication. <b>Separate by spaces or commas.</b></p>
+            <div class="form-group">
+                <label>Trusted Relay IPs (mynetworks)</label>
+                <textarea name="mynetworks" class="form-input" rows="3" placeholder="127.0.0.0/8, 103.27.61.218">{{ mynetworks }}</textarea>
+                <p class="small text-info mt-1">💡 Add your external server's IP (e.g., 103.27.61.218) here to fix "Relay access denied".</p>
+            </div>
+        </div>
+
+        <div class="section-header" style="grid-column: 1 / -1; margin-top: 20px;">
+            <!-- ── Postfix Relay Limits ───────────────────────────────────────── -->
 
         <div class="form-group">
             <label>SMTPD Recipient Limit</label>

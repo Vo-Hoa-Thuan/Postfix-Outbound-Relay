@@ -16,15 +16,17 @@ router = APIRouter(prefix="/settings")
 
 @router.get("", response_class=HTMLResponse)
 async def view_settings(request: Request, msg: str = "", error: str = ""):
-    from core.postfix import get_postfix_limits, get_postfix_identity
+    from core.postfix import get_postfix_limits, get_postfix_identity, get_mynetworks
     settings = get_settings()
     postfix_limits = get_postfix_limits()
     postfix_identity = get_postfix_identity()
+    mynetworks = get_mynetworks()
     return templates.TemplateResponse("settings.html", {
         "request": request,
         "settings": settings,
         "postfix_limits": postfix_limits,
         "postfix_identity": postfix_identity,
+        "mynetworks": mynetworks,
         "msg": msg,
         "error": error
     })
@@ -44,6 +46,8 @@ async def save_settings_post(
     # Postfix Identity
     myhostname: str = Form(""),
     mydomain: str = Form(""),
+    # Relay Access
+    mynetworks: str = Form(""),
     # Postfix Limits
     recipient_limit: int = Form(1000),
     message_size: int = Form(10240000),
@@ -67,10 +71,11 @@ async def save_settings_post(
     
     save_settings(settings)
 
-    # Apply Postfix Identity & Limits
-    from core.postfix import apply_postfix_limits, apply_postfix_identity
+    # Apply Postfix Identity, Networks & Limits
+    from core.postfix import apply_postfix_limits, apply_postfix_identity, apply_mynetworks
     
     ok1, i_msg = apply_postfix_identity(myhostname.strip(), mydomain.strip())
+    ok2, n_msg = apply_mynetworks(mynetworks.strip())
     
     postfix_cfg = {
         "smtpd_recipient_limit": str(recipient_limit),
@@ -78,11 +83,15 @@ async def save_settings_post(
         "default_destination_concurrency_limit": str(dest_concurrency),
         "default_destination_recipient_limit": str(dest_recipient_limit)
     }
-    ok2, p_msg = apply_postfix_limits(postfix_cfg)
+    ok3, p_msg = apply_postfix_limits(postfix_cfg)
     
     msg = "Settings saved successfully"
-    if not ok1 or not ok2:
-        combined_err = (i_msg if not ok1 else "") + " | " + (p_msg if not ok2 else "")
+    if not ok1 or not ok2 or not ok3:
+        combined_err = " | ".join(filter(None, [
+            i_msg if not ok1 else None,
+            n_msg if not ok2 else None,
+            p_msg if not ok3 else None
+        ]))
         return RedirectResponse(f"/settings?msg={msg}&error={combined_err}", status_code=303)
         
     return RedirectResponse(f"/settings?msg={msg}+and+Postfix+config+applied", status_code=303)
