@@ -100,25 +100,24 @@ def parse_maillog(limit: int = 2000) -> None:
             break
             
     if not target_log:
+        print("[LogReader] No mail log found in common paths.")
         return
+
+    print(f"[LogReader] Using log file: {target_log}")
 
     state = _read_state()
     offset = state.get("offset")
     
-    # If this is the VERY first time running (no state), start from the END
+    # If this is the VERY first time running (no state), start from 0 
+    # so we see recent activity immediately.
     if offset is None:
-        try:
-            offset = os.path.getsize(target_log)
-            _write_state({"offset": offset})
-            return
-        except Exception:
-            offset = 0
+        offset = 0
+        print(f"[LogReader] Initializing state, starting from offset 0")
 
     # If log rotated (current log smaller than offset), reset to 0
-    try:
-        if os.path.getsize(target_log) < offset:
-            offset = 0
-    except Exception:
+    file_size = os.path.getsize(target_log)
+    if file_size < offset:
+        print(f"[LogReader] Log rotation detected, resetting offset to 0")
         offset = 0
 
     entries = []
@@ -135,6 +134,7 @@ def parse_maillog(limit: int = 2000) -> None:
                 # --- [1] POSTFIX PARSING ---
                 m_smtp = RE_SMTP.search(line)
                 if m_smtp:
+                    # ... (rest of logic)
                     entry = {
                         "time":     _parse_timestamp(m_smtp.group("month"), m_smtp.group("day"), m_smtp.group("time")),
                         "qid":      m_smtp.group("qid"),
