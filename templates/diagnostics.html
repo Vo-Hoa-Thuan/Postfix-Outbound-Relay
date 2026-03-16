@@ -32,11 +32,11 @@
         </form>
 
         {% if request.query_params.get('msg_id') %}
-        <div id="trace-panel" class="mt-2" style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #3498db;">
-            <h3 style="font-size: 1rem; margin-bottom: 10px;">🔍 Real-Time Trace</h3>
-            <p class="small mono">Target Message-ID: <span id="trace-msg-id">{{ request.query_params.get('msg_id') }}</span></p>
-            <div id="trace-results" class="mono small" style="max-height: 200px; overflow-y: auto; background: #fff; padding: 10px; border: 1px solid #eee;">
-                Polling logs...
+        <div id="trace-panel" class="mt-2" style="border-left: 4px solid var(--accent); padding-left: 15px;">
+            <h3 class="card-title" style="margin-bottom: 8px;">🔍 Real-Time Trace</h3>
+            <p class="small muted mb-1">Target Message-ID: <span id="trace-msg-id" class="mono">{{ request.query_params.get('msg_id') }}</span></p>
+            <div id="trace-results" class="terminal-box" style="max-height: 300px;">
+                <span class="muted">Polling logs...</span>
             </div>
             <button onclick="pollTrace()" class="btn btn-xs btn-secondary mt-1">Refresh Trace</button>
         </div>
@@ -84,9 +84,9 @@
             }
             
             results.innerHTML = data.map(ev => {
-                if (ev.error) return `<div class="text-danger">Error: ${ev.error}</div>`;
+                if (ev.error) return `<div class="flash-error">Error: ${ev.error}</div>`;
                 if (ev.raw) return `<div>${ev.raw}</div>`;
-                return `<div><span class="text-blue">[${ev.time}]</span> <b>${ev.qid}</b>: ${ev.info}</div>`;
+                return `<div><span class="timestamp">[${ev.time}]</span> <b>${ev.qid}</b>: ${ev.info}</div>`;
             }).join('');
             
         } catch (err) {

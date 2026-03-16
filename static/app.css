@@ -29,9 +29,9 @@
   --purple: #818cf8;
   /* indigo-400 */
 
-  --text-primary: #e2e8f0;
-  --text-secondary: #94a3b8;
-  --text-muted: #475569;
+  --text-primary: #ffffff;
+  --text-secondary: #cbd5e1; /* slate-300 */
+  --text-muted: #94a3b8;    /* slate-400 */
 
   --sidebar-w: 226px;
   --sidebar-coll: 62px;
@@ -69,9 +69,9 @@ body.light {
   --blue-bg: rgba(2, 132, 199, .1);
   --purple: #6366f1;
 
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
+  --text-primary: #020617; /* slate-950 */
+  --text-secondary: #334155; /* slate-700 */
+  --text-muted: #64748b;    /* slate-500 */
 
   --shadow: 0 4px 24px rgba(0, 0, 0, .1);
   --shadow-card: 0 1px 3px rgba(0, 0, 0, .08);
@@ -424,6 +424,29 @@ body.light .card {
   font-weight: 600;
   margin-bottom: 1rem;
   color: var(--text-primary);
+}
+
+/* ── Utility: Terminal Box ───────────────────────────────────────────────── */
+.terminal-box {
+  background: #020617 !important;
+  color: #10b981 !important; /* emerald-500 */
+  font-family: var(--ff-mono);
+  padding: 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  overflow-y: auto;
+  box-shadow: inset 0 2px 8px rgba(0,0,0,0.5);
+}
+
+.terminal-box b {
+  color: var(--accent);
+}
+
+.terminal-box .timestamp {
+  color: #64748b;
+  margin-right: 8px;
 }
 
 .mt-2 {
