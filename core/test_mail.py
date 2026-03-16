@@ -5,7 +5,7 @@ import smtplib
 import time
 import uuid
 from email.message import EmailMessage
-from typing import Tuple, Dict
+from typing import Tuple, Dict, Any
 
 def send_test_email(to_email: str, from_email: str = "test@relay.local", subject: str = "SMTP Test Message") -> Dict[str, Any]:
     """

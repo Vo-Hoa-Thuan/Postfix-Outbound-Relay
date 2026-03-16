@@ -3,7 +3,7 @@ core/tracking.py – Parse Postfix logs to track message status.
 """
 import subprocess
 import re
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 
 # Regex for Postfix log lines
 # Example: Mar 16 10:00:00 server postfix/smtp[123]: ABCDEF12345: to=<user@example.com>, relay=... status=sent (250 2.0.0 Ok: queued as XYZ)

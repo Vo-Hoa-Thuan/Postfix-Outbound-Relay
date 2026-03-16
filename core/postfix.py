@@ -12,7 +12,7 @@ IP Rotation strategy:
 
 import os
 import subprocess
-from typing import Tuple
+from typing import Tuple, Dict
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
