@@ -52,19 +52,24 @@ async def _rotation_loop():
     from core.postfix import sync_transport
     from core.blacklist import auto_check_all
     
-    print("[RelayPanel] Started background IP rotation loop.")
+    print("[RelayPanel] Started background IP rotation and log monitor loop.")
     while True:
         try:
+            # 1. IP Rotation
             rotated, new_ip = rotate_if_needed()
             if rotated and new_ip:
                 print(f"[RelayPanel] Auto-rotated to IP: {new_ip}")
                 sync_transport(new_ip)
                 
-            # Periodic background checks (the function itself throttles to 12h)
+            # 2. Periodic background checks
             auto_check_all()
+
+            # 3. Real-time Log Monitoring
+            from logs.reader import parse_maillog
+            parse_maillog(limit=1000)
             
         except Exception as e:
-            print(f"[RelayPanel] Rotation loop error: {e}")
+            print(f"[RelayPanel] Background loop error: {e}")
         await asyncio.sleep(5)
 
 

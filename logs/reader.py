@@ -67,9 +67,16 @@ def parse_maillog(limit: int = 5000) -> None:
     Read new lines from maillog since last offset, parse SMTP delivery events,
     and append to parsed.log.
     """
-    if not os.path.exists(MAILLOG):
-        print(f"Maillog not found: {MAILLOG}")
-        return
+    # Try common log locations
+    log_paths = ["/var/log/maillog", "/var/log/mail.log"]
+    target_log = None
+    for p in log_paths:
+        if os.path.exists(p):
+            target_log = p
+            break
+            
+    if not target_log:
+        return # Skip silently if no log found (e.g. on Windows/Dev)
 
     state  = _read_state()
     offset = state.get("offset", 0)
@@ -77,7 +84,7 @@ def parse_maillog(limit: int = 5000) -> None:
     entries = []
     new_offset = offset
 
-    with open(MAILLOG, "r", errors="replace") as f:
+    with open(target_log, "r", errors="replace") as f:
         f.seek(offset)
         count = 0
         for line in f:
