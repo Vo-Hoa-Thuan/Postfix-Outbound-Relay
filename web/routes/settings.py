@@ -71,28 +71,23 @@ async def save_settings_post(
     
     save_settings(settings)
 
-    # Apply Postfix Identity, Networks & Limits
-    from core.postfix import apply_postfix_limits, apply_postfix_identity, apply_mynetworks
+    # Apply Postfix Identity, Networks & Limits in ONE batch for performance
+    from core.postfix import apply_postfix_settings_batch
     
-    ok1, i_msg = apply_postfix_identity(myhostname.strip(), mydomain.strip())
-    ok2, n_msg = apply_mynetworks(mynetworks.strip())
-    
-    postfix_cfg = {
+    identity = {"myhostname": myhostname.strip(), "mydomain": mydomain.strip()}
+    networks = mynetworks.strip()
+    limits = {
         "smtpd_recipient_limit": str(recipient_limit),
         "message_size_limit": str(message_size),
         "default_destination_concurrency_limit": str(dest_concurrency),
         "default_destination_recipient_limit": str(dest_recipient_limit)
     }
-    ok3, p_msg = apply_postfix_limits(postfix_cfg)
+    
+    ok, p_msg = apply_postfix_settings_batch(identity, networks, limits)
     
     msg = "Settings saved successfully"
-    if not ok1 or not ok2 or not ok3:
-        combined_err = " | ".join(filter(None, [
-            i_msg if not ok1 else None,
-            n_msg if not ok2 else None,
-            p_msg if not ok3 else None
-        ]))
-        return RedirectResponse(f"/settings?msg={msg}&error={combined_err}", status_code=303)
+    if not ok:
+        return RedirectResponse(f"/settings?msg={msg}&error={p_msg}", status_code=303)
         
     return RedirectResponse(f"/settings?msg={msg}+and+Postfix+config+applied", status_code=303)
 

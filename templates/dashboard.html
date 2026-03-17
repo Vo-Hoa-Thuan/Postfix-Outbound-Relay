@@ -48,6 +48,7 @@
     <div class="health-status-card good">
         <span class="health-label" data-i18n="lbl_rot_trigger">Rotation: Trigger</span>
         <span class="health-value" id="countdown">{{ time_remaining }}s</span>
+        <span id="countdown-init" data-remaining="{{ time_remaining }}" style="display:none"></span>
     </div>
 </div>
 
@@ -187,6 +188,24 @@
         btn.textContent = translations[localStorage.getItem('rp_lang') || 'vn']['btn_refresh'];
     }
 
+    // --- Manual Tick for smooth countdown ---
+    const countdownInit = document.getElementById('countdown-init');
+    let remainingTime = parseInt(countdownInit ? countdownInit.dataset.remaining : 0);
+    
+    function tick() {
+        const countdownEl = document.getElementById('countdown');
+        if (!countdownEl) return;
+        
+        if (remainingTime > 0) {
+            remainingTime--;
+            countdownEl.textContent = remainingTime + 's';
+        } else {
+            const t = translations[localStorage.getItem('rp_lang') || 'vn'];
+            countdownEl.textContent = t ? (t['status_pending'] || 'PENDING...') : 'PENDING...';
+        }
+    }
+    setInterval(tick, 1000);
+
     // --- Optimized Polling with Locking ---
     let isPollingStatus = false;
     async function pollStatus() {
@@ -198,7 +217,10 @@
             
             // 1. Update Countdown
             const countdownEl = document.getElementById('countdown');
-            if (countdownEl) countdownEl.textContent = data.time_remaining + 's';
+            if (countdownEl) {
+                remainingTime = data.time_remaining;
+                countdownEl.textContent = remainingTime + 's';
+            }
             
             // 2. Update Health Badges
             const hCards = document.querySelectorAll('.health-status-card');
@@ -233,14 +255,13 @@
         } catch(e) { console.error("Status poll failed:", e); }
         finally { isPollingStatus = false; }
     }
-    // Status poll: 15s (Backend logic is stable enough)
-    setInterval(pollStatus, 15000);
+    // Status poll: 5s (Better for real-time feel)
+    setInterval(pollStatus, 5000);
 
-    // Activity Refresh: 8s
+    // Activity Refresh: 5s
     let isRefreshingLogs = false;
     async function refreshLogs() {
         if (isRefreshingLogs) return;
-        const btn = document.querySelector('.btn-refresh-logs'); // Optional if manual btn exists
         isRefreshingLogs = true;
         try {
             const res = await fetch('/api/logs');
@@ -256,6 +277,7 @@
                         <td class="text-muted small">${entry.time.split(' ')[1] || entry.time}</td>
                         <td><div class="log-subject truncate" title="${entry.from}">${entry.from}</div></td>
                         <td><div class="log-subject truncate" title="${entry.to}">${entry.to}</div></td>
+                        <td class="mono small">${entry.local_ip || '—'}</td>
                         <td><span class="ops-badge ops-badge-${entry.status}">${getI18nStatus(entry.status)}</span></td>
                     </tr>`;
                 body.insertAdjacentHTML('beforeend', row);
@@ -263,7 +285,7 @@
         } catch(e) { console.error("Log refresh failed:", e); }
         finally { isRefreshingLogs = false; }
     }
-    setInterval(refreshLogs, 8000);
+    setInterval(refreshLogs, 5000);
 
     // ── Activity Chart [Optimized Update] ────────────────
     let mailChart = null;

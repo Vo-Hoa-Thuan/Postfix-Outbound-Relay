@@ -70,6 +70,7 @@
                 <div id="countdown" style="font-size: 3rem; font-weight: 800; color: var(--accent); font-family: var(--ff-mono); text-shadow: 0 0 20px var(--accent-glow);">
                     {{ time_remaining }}s
                 </div>
+                <span id="countdown-init" data-remaining="{{ time_remaining }}" style="display:none"></span>
                 <div class="text-muted mt-1" style="font-size: 0.85rem; letter-spacing: 0.05em;" data-i18n="lbl_timer_active">TIMER ACTIVE</div>
                 <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border-light); font-size: 0.8rem; color: var(--text-secondary);">
                     <span data-i18n="lbl_curr_strat">Current Strategy</span>: <span class="badge badge-blue" data-i18n="status_{{ mode.lower() }}">{{ mode | upper }}</span>
@@ -97,17 +98,40 @@
 <script>
     function setIntervalVal(v) { document.getElementById('rotSecs').value = v; }
 
-    let remaining = {{ time_remaining }};
+    const countdownInit = document.getElementById('countdown-init');
+    let remaining = parseInt(countdownInit ? countdownInit.dataset.remaining : 0);
     const el = document.getElementById('countdown');
-    function tick() {
+    let isPolling = false;
+
+    async function tick() {
         const t = translations[localStorage.getItem('rp_lang') || 'vn'];
         if (remaining > 0) {
             remaining--;
             el.textContent = remaining + 's';
-        } else {
-            el.textContent = t['status_pending'];
+        } else if (!isPolling) {
+            // Sync with server when hits 0
+            el.textContent = t['status_pending'] || 'PENDING...';
+            syncStatus();
         }
     }
+
+    async function syncStatus() {
+        if (isPolling) return;
+        isPolling = true;
+        try {
+            const res = await fetch('/api/status');
+            const data = await res.json();
+            remaining = data.time_remaining;
+            el.textContent = remaining + 's';
+            
+            // If active IP changed, we might want to refresh the page or update UI
+            // For now, syncing the timer is the priority.
+        } catch(e) { console.error("Sync failed", e); }
+        finally { isPolling = false; }
+    }
+
     setInterval(tick, 1000);
+    // Hard sync every 15s regardless
+    setInterval(syncStatus, 15000);
 </script>
 {% endblock %}

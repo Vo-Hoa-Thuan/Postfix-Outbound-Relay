@@ -256,5 +256,43 @@
             document.getElementById('bulkCheckForm').submit();
         }
     }
+    async function pollStatus() {
+        try {
+            const res = await fetch('/api/status');
+            const data = await res.json();
+            const activeIp = data.active_ip;
+            
+            // Update Active Badge and Rows
+            document.querySelectorAll('tr[id^="row-"]').forEach(row => {
+                const rowIp = row.id.replace('row-', '').replace(/-/g, '.');
+                if (rowIp === activeIp) {
+                    row.classList.add('row-active');
+                    // Add badge if not present
+                    if (!row.querySelector('.badge-blue')) {
+                        const target = row.querySelector('td div');
+                        if (target) {
+                            const badge = document.createElement('span');
+                            badge.className = 'badge badge-blue';
+                            badge.dataset.i18n = 'status_active';
+                            badge.textContent = 'ACTIVE';
+                            target.appendChild(badge);
+                        }
+                    }
+                } else {
+                    row.classList.remove('row-active');
+                    const badge = row.querySelector('.badge-blue');
+                    if (badge) badge.remove();
+                }
+            });
+
+            // Update footer total if exists
+            const activeDisplay = document.querySelector('.text-accent');
+            if (activeDisplay && activeDisplay.innerText.includes('Relay')) {
+                activeDisplay.textContent = activeIp || 'None';
+            }
+
+        } catch(e) { console.error("Poll failed", e); }
+    }
+    setInterval(pollStatus, 5000);
 </script>
 {% endblock %}

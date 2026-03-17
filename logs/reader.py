@@ -114,7 +114,15 @@ def parse_maillog(limit: int = 500) -> None:
 
 def _parse_journal_incremental(state: dict) -> None:
     """Read only NEW journal entries since the last recorded cursor."""
+    if os.name == 'nt':
+        return # journalctl doesn't exist on Windows
+        
     try:
+        # Check if journalctl is available
+        import shutil
+        if not shutil.which("journalctl"):
+            return
+            
         cursor = state.get("journal_cursor")
         cmd = ["journalctl", "-u", "postfix", "--no-pager", "-o", "json"]
         if cursor:

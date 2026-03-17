@@ -62,25 +62,27 @@ async def _background_tasks():
     
     while True:
         try:
+            loop = asyncio.get_event_loop()
             now = time.time()
             
-            # 1. IP Rotation (Every check, has internal logic)
-            rotated, new_ip = rotate_if_needed()
+            # 1. IP Rotation (Every check, has internal logic) - Thread-safe because it writes files
+            rotated, new_ip = await loop.run_in_executor(None, rotate_if_needed)
             if rotated and new_ip:
                 print(f"[RelayPanel] Auto-rotated to IP: {new_ip}")
-                sync_transport(new_ip)
+                # sync_transport reloads postfix, which is slow - run in executor
+                await loop.run_in_executor(None, sync_transport, new_ip)
                 
-            # 2. Blacklist Check (Has internal throttling/interval)
-            auto_check_all()
+            # 2. Blacklist Check (Has internal throttling/interval) - VERY SLOW
+            await loop.run_in_executor(None, auto_check_all)
 
             # 3. Incremental Log Monitoring (Every 10 seconds)
             if now - last_log_parse > 10:
-                parse_maillog(limit=500)
+                await loop.run_in_executor(None, parse_maillog, 500)
                 last_log_parse = now
                 
             # 4. Chart Pre-Aggregation (Every 60 seconds)
             if now - last_chart_agg > 60:
-                pre_aggregate_chart()
+                await loop.run_in_executor(None, pre_aggregate_chart)
                 last_chart_agg = now
             
         except Exception as e:

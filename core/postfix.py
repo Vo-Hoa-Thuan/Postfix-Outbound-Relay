@@ -172,6 +172,36 @@ def apply_mynetworks(networks_str: str) -> Tuple[bool, str]:
         return False, str(e)
 
 
+def apply_postfix_settings_batch(identity: Dict[str, str], networks: str, limits: Dict[str, str]) -> Tuple[bool, str]:
+    """Apply all settings at once and reload once for performance."""
+    try:
+        # Atomic gathering of commands
+        cmds = []
+        if identity.get("myhostname"): cmds.append(f"postconf -e 'myhostname={identity['myhostname']}'")
+        if identity.get("mydomain"):   cmds.append(f"postconf -e 'mydomain={identity['mydomain']}'")
+        
+        # Networks
+        if networks:
+            if "127.0.0.0/8" not in networks: networks = "127.0.0.0/8 " + networks
+            cmds.append(f"postconf -e 'mynetworks={networks.strip()}'")
+            
+        # Limits
+        for key, val in limits.items():
+            cmds.append(f"postconf -e '{key}={val}'")
+            
+        # Execute all postconf commands (silent, we check final reload)
+        for cmd in cmds:
+            run_command(cmd)
+            
+        # Single reload
+        ok, out = safe_reload_postfix()
+        if not ok:
+            return False, f"Postfix update failed during reload: {out}"
+        return True, "All Postfix settings applied successfully."
+    except Exception as e:
+        return False, str(e)
+
+
 # ── Internal helpers ─────────────────────────────────────────────────────────
 
 def _run(cmd: str) -> Tuple[bool, str]:

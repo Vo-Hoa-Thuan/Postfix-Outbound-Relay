@@ -187,12 +187,20 @@ async def check_ip_blacklist_route(ip: str = Form(...), force: bool = Form(False
 @router.post("/check-all-blacklist")
 async def check_all_blacklist_route(force: bool = Form(False)):
     from core.blacklist import process_ip_blacklist_alert
-    data = _read_ips()
-    for ip_entry in data.get("ips", []):
-        if ip_entry.get("enabled", True):
-            process_ip_blacklist_alert(ip_entry.get("ip"), force_refresh=force)
+    
+    # Run in background to avoid timeout
+    async def _run_checks():
+        data = _read_ips()
+        for ip_entry in data.get("ips", []):
+            if ip_entry.get("enabled", True):
+                # Run synchronous blocking alert in executor
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(None, process_ip_blacklist_alert, ip_entry.get("ip"), force)
+    
+    import asyncio
+    asyncio.create_task(_run_checks())
             
-    return RedirectResponse("/ips?msg=Blacklist+check+completed+for+all+enabled+IPs.", status_code=303)
+    return RedirectResponse("/ips?msg=Blacklist+check+started+in+background+for+all+enabled+IPs.", status_code=303)
 
 @router.get("/status/{ip}")
 async def get_ip_status(ip: str):
