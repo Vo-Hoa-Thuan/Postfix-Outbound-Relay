@@ -1,361 +1,113 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% block title %}Postfix Relay Panel{% endblock %}</title>
-  <meta name="description" content="Postfix Outbound SMTP Relay Management Panel" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-    rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/app.css" />
-  <!-- Apply saved theme immediately to prevent flash -->
   <script>
     (function () {
       var t = localStorage.getItem('rp_theme') || 'dark';
       if (t === 'light') document.documentElement.classList.add('light-pre');
     })();
   </script>
-  <style>
-    html.light-pre body {
-      background: #f0f4f8;
-    }
-  </style>
 </head>
+<body class="{% if request.cookies.get('theme') == 'light' %}light{% endif %}">
 
-<body>
-
-  <!-- ── Sidebar ─────────────────────────────────────────────────────────── -->
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-logo">
-      <span class="logo-icon">✉</span>
-      <span class="logo-text">RelayPanel</span>
+  <header class="app-header">
+    <div class="logo-area">
+      <div class="logo-icon">✉</div>
+      <div class="logo-text">RelayPanel</div>
     </div>
 
-    <nav class="sidebar-nav">
-      <a href="/" class="nav-item {% if active_page == 'dashboard' %}active{% endif %}">
-        <span class="nav-icon">⬡</span><span class="nav-label" data-i18n="nav_dashboard">Dashboard</span>
+    <nav class="nav-tabs">
+      <a href="/" class="nav-tab {% if active_page == 'dashboard' %}active{% endif %}" data-i18n="nav_dashboard">
+        <span class="icon">⬡</span> <span>Dashboard</span>
       </a>
-      <a href="/ips" class="nav-item {% if active_page == 'ips' %}active{% endif %}">
-        <span class="nav-icon">◈</span><span class="nav-label" data-i18n="nav_ips">IP Manager</span>
+      <a href="/ips" class="nav-tab {% if active_page == 'ips' %}active{% endif %}" data-i18n="nav_ips">
+        <span class="icon">◈</span> <span>IP Management</span>
       </a>
-      <a href="/rotation" class="nav-item {% if active_page == 'rotation' %}active{% endif %}">
-        <span class="nav-icon">↻</span><span class="nav-label" data-i18n="nav_rotation">IP Rotation</span>
+      <a href="/rotation" class="nav-tab {% if active_page == 'rotation' %}active{% endif %}" data-i18n="nav_rotation">
+        <span class="icon">↻</span> <span>Rotation</span>
       </a>
-      <a href="/rspamd" class="nav-item {% if active_page == 'rspamd' %}active{% endif %}">
-        <span class="nav-icon">⚙</span><span class="nav-label" data-i18n="nav_rspamd">Rspamd</span>
+      <a href="/rspamd" class="nav-tab {% if active_page == 'rspamd' %}active{% endif %}" data-i18n="nav_rspamd">
+        <span class="icon">⚙</span> <span>Rspamd</span>
       </a>
-      <a href="/logs" class="nav-item {% if active_page == 'logs' %}active{% endif %}">
-        <span class="nav-icon">≡</span><span class="nav-label" data-i18n="nav_logs">SMTP Monitor</span>
+      <a href="/logs" class="nav-tab {% if active_page == 'logs' %}active{% endif %}" data-i18n="nav_logs">
+        <span class="icon">≡</span> <span>SMTP Monitor</span>
       </a>
-      <a href="/diagnostics" class="nav-item {% if active_page == 'diagnostics' %}active{% endif %}">
-        <span class="nav-icon">🩺</span><span class="nav-label" data-i18n="nav_diagnostics">Diagnostics</span>
+      <a href="/diagnostics" class="nav-tab {% if active_page == 'diagnostics' %}active{% endif %}" data-i18n="nav_diag">
+        <span class="icon">🩺</span> <span>Diagnostics</span>
       </a>
-      <a href="/settings" class="nav-item {% if active_page == 'settings' %}active{% endif %}">
-        <span class="nav-icon">⚙️</span><span class="nav-label" data-i18n="nav_settings">Settings</span>
+      <a href="/settings" class="nav-tab {% if active_page == 'settings' %}active{% endif %}" data-i18n="nav_settings">
+        <span class="icon">⚙️</span> <span>Settings</span>
       </a>
     </nav>
 
-    <div class="sidebar-footer">
-      <span class="version-badge">v1.0.0</span>
-    </div>
-  </aside>
-
-  <!-- ── Main content ────────────────────────────────────────────────────── -->
-  <div class="main-wrap">
-
-    <header class="topbar">
-      <button class="sidebar-toggle" onclick="document.getElementById('sidebar').classList.toggle('collapsed')"
-        title="Toggle sidebar">☰</button>
-      <h1 class="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
-      <div class="topbar-right">
-        <span class="topbar-time" id="clock"></span>
-
-        <!-- Language Toggle -->
-        <button class="ctrl-btn" id="langBtn" onclick="toggleLang()" title="Switch language">
-          <span id="langLabel">VI</span>
-        </button>
-
-        <!-- Theme Toggle -->
-        <button class="ctrl-btn" id="themeBtn" onclick="toggleTheme()" title="Switch theme">
-          <span id="themeIcon">☀</span>
-        </button>
+    <div class="header-actions">
+      <!-- Language Switcher -->
+      <div class="lang-switcher" style="display: flex; gap: 0.5rem; margin-right: 1rem; padding-right: 1rem; border-right: 1px solid var(--border);">
+        <button class="btn btn-secondary btn-xs" onclick="switchLanguage('vn')" title="Tiếng Việt">VN</button>
+        <button class="btn btn-secondary btn-xs" onclick="switchLanguage('en')" title="English">EN</button>
       </div>
-    </header>
+      
+      <div class="clock-box" id="clock">00:00:00</div>
+      <button class="btn btn-secondary btn-xs" id="themeBtn" onclick="toggleTheme()">
+        <span id="themeIcon">☀</span>
+      </button>
+    </div>
+  </header>
 
-    <!-- Flash messages -->
+  <div class="flash-container">
     {% if msg %}
     <div class="flash flash-success">✓ {{ msg }}</div>
     {% endif %}
     {% if error %}
     <div class="flash flash-error">✕ {{ error }}</div>
     {% endif %}
-
-    <main class="content">
-      {% block content %}{% endblock %}
-    </main>
   </div>
 
+  <main class="main-content">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script src="/static/i18n.js"></script>
   <script>
-    // ── i18n Dictionary ─────────────────────────────────────────────────
-    const LANGS = {
-      vi: {
-        nav_dashboard: 'Tổng quan',
-        nav_ips: 'Quản lý IP',
-        nav_rotation: 'Xoay IP',
-        nav_rspamd: 'Rspamd',
-        nav_logs: 'SMTP Monitor',
-        nav_diagnostics: 'Công Cụ Chẩn Đoán',
-        nav_settings: 'Cài Đặt Hệ Thống',
-        // dashboard
-        lbl_postfix: 'Postfix',
-        lbl_rspamd: 'Rspamd',
-        lbl_active_ip: 'IP Đang Dùng',
-        lbl_next_rot: 'Xoay Tiếp',
-        lbl_sent_h: 'Đã Gửi (Giờ Này)',
-        lbl_deferred_h: 'Bị Trì Hoãn',
-        lbl_ip_counters: 'Thống Kê Gửi Theo IP (Giờ Hiện Tại)',
-        col_ip: 'Địa Chỉ IP',
-        col_sent_h: 'Đã Gửi Giờ Này',
-        col_window: 'Bắt Đầu Cửa Sổ',
-        lbl_no_activity: 'Chưa có hoạt động gửi trong giờ này.',
-        lbl_quick_actions: 'Hành Động Nhanh',
-        btn_manage_ips: 'Quản Lý IP',
-        btn_rotation_set: 'Cài Đặt Xoay IP',
-        btn_rspamd_cfg: 'Cấu Hình Rspamd',
-        btn_view_logs: 'Xem Nhật Ký SMTP',
-        btn_force_rotate: '⟳ Xoay IP Ngay',
-        // ips
-        ttl_add_ip: 'Thêm IP Relay Mới',
-        lbl_ip_addr: 'Địa Chỉ IP',
-        lbl_weight: 'Trọng Số',
-        lbl_limit_hr: 'Giới Hạn / Giờ',
-        lbl_note: 'Ghi Chú',
-        lbl_enabled: 'Kích Hoạt',
-        btn_add_ip: '+ Thêm IP',
-        ttl_relay_ips: 'Danh Sách IP Relay',
-        col_status: 'Trạng Thái',
-        col_actions: 'Hành Động',
-        btn_edit: 'Sửa',
-        btn_delete: 'Xóa',
-        lbl_no_ips: 'Chưa có IP nào được cấu hình. Thêm IP ở trên.',
-        ttl_edit_ip: 'Sửa IP:',
-        btn_cancel: 'Hủy',
-        btn_save: 'Lưu Thay Đổi',
-        // rotation
-        ttl_rot_config: 'Cấu Hình Xoay IP',
-        lbl_rot_interval: 'Chu Kỳ Xoay',
-        lbl_seconds: 'giây',
-        lbl_rot_mode: 'Chế Độ Xoay',
-        mode_weighted: 'Có Trọng Số',
-        mode_weighted_d: 'IP có trọng số cao được chọn thường xuyên hơn',
-        mode_rr: 'Vòng Quay',
-        mode_rr_d: 'Các IP được chọn đều nhau theo thứ tự',
-        btn_save_set: 'Lưu Cài Đặt',
-        lbl_next_rot_in: 'Xoay Tiếp Theo Sau',
-        ttl_manual_rot: 'Xoay Thủ Công',
-        txt_manual_rot: 'Ép xoay IP ngay lập tức, bỏ qua bộ đếm giờ.',
-        btn_rotate_now: '⟳ Xoay Ngay',
-        // rspamd
-        ttl_filter_set: 'Cài Đặt Bộ Lọc',
-        lbl_enable_rsp: 'Bật Rspamd – Lọc chống spam',
-        lbl_reject_score: 'Ngưỡng Từ Chối',
-        lbl_points: 'điểm',
-        lbl_score_help: 'Email có điểm trên ngưỡng này sẽ bị từ chối. Greylist tại ngưỡng − 1.5.',
-        lbl_greylist: 'Bật Greylisting',
-        lbl_rate_limit: 'Bật Giới Hạn Tốc Độ',
-        lbl_burst: 'Burst',
-        lbl_rate: 'Rate',
-        lbl_whitelist_ip: 'Whitelist IP (mỗi dòng 1 IP)',
-        lbl_blacklist_dm: 'Blacklist Domains (mỗi dòng 1 domain)',
-        btn_save_reload: 'Lưu & Tải Lại Rspamd',
-        ttl_rsp_service: 'Dịch Vụ Rspamd',
-        ttl_cfg_summary: 'Tóm Tắt Cấu Hình Hiện Tại',
-        row_enabled: 'Kích Hoạt',
-        row_req_score: 'Điểm Từ Chối',
-        row_greylist: 'Greylist',
-        row_rate_limit: 'Giới Hạn Tốc Độ',
-        row_whitelist: 'Whitelist IP',
-        row_blacklist: 'Blacklist Domain',
-        // logs
-        lbl_local_ip: 'IP Local',
-        lbl_all_ips: 'Tất Cả IP',
-        lbl_sender: 'Người Gửi',
-        lbl_recipient: 'Người Nhận',
-        lbl_date: 'Ngày',
-        lbl_status: 'Trạng Thái',
-        lbl_all: 'Tất Cả',
-        btn_filter: 'Lọc',
-        btn_reset: 'Đặt Lại',
-        ttl_mail_log: 'Nhật Ký Mail',
-        col_time: 'Thời Gian',
-        col_from: 'Từ',
-        col_to: 'Đến',
-        col_subject: 'Tiêu Đề',
-        col_dest_ip: 'IP Đích',
-        col_local_ip: 'IP Local',
-        lbl_no_logs: 'Không có nhật ký nào phù hợp.',
-        btn_clear_filter: 'Xóa Bộ Lọc',
-      },
-      en: {
-        nav_dashboard: 'Dashboard',
-        nav_ips: 'IP Manager',
-        nav_rotation: 'IP Rotation',
-        nav_rspamd: 'Rspamd',
-        nav_logs: 'SMTP Monitor',
-        nav_diagnostics: 'Diagnostics',
-        nav_settings: 'Settings',
-        lbl_postfix: 'Postfix',
-        lbl_rspamd: 'Rspamd',
-        lbl_active_ip: 'Active IP',
-        lbl_next_rot: 'Next Rotation',
-        lbl_sent_h: 'Sent (This Hour)',
-        lbl_deferred_h: 'Deferred',
-        lbl_ip_counters: 'Per-IP Send Counters (Current Hour)',
-        col_ip: 'IP Address',
-        col_sent_h: 'Sent This Hour',
-        col_window: 'Window Start',
-        lbl_no_activity: 'No send activity recorded this hour.',
-        lbl_quick_actions: 'Quick Actions',
-        btn_manage_ips: 'Manage IPs',
-        btn_rotation_set: 'Rotation Settings',
-        btn_rspamd_cfg: 'Rspamd Config',
-        btn_view_logs: 'View SMTP Logs',
-        btn_force_rotate: '⟳ Force IP Rotation Now',
-        ttl_add_ip: 'Add New Relay IP',
-        lbl_ip_addr: 'IP Address',
-        lbl_weight: 'Weight',
-        lbl_limit_hr: 'Limit / Hour',
-        lbl_note: 'Note',
-        lbl_enabled: 'Enabled',
-        btn_add_ip: '+ Add IP',
-        ttl_relay_ips: 'Relay IPs',
-        col_status: 'Status',
-        col_actions: 'Actions',
-        btn_edit: 'Edit',
-        btn_delete: 'Delete',
-        lbl_no_ips: 'No relay IPs configured yet. Add one above.',
-        ttl_edit_ip: 'Edit IP:',
-        btn_cancel: 'Cancel',
-        btn_save: 'Save Changes',
-        ttl_rot_config: 'Rotation Configuration',
-        lbl_rot_interval: 'Rotation Interval',
-        lbl_seconds: 'seconds',
-        lbl_rot_mode: 'Rotation Mode',
-        mode_weighted: 'Weighted',
-        mode_weighted_d: 'IPs with higher weight are selected more often',
-        mode_rr: 'Round Robin',
-        mode_rr_d: 'IPs selected equally in strict rotation order',
-        btn_save_set: 'Save Settings',
-        lbl_next_rot_in: 'Next Rotation In',
-        ttl_manual_rot: 'Manual Rotation',
-        txt_manual_rot: 'Force an immediate IP rotation, bypassing the timer.',
-        btn_rotate_now: '⟳ Rotate Now',
-        ttl_filter_set: 'Filter Settings',
-        lbl_enable_rsp: 'Enable Rspamd – Anti-spam filtering',
-        lbl_reject_score: 'Reject Score Threshold',
-        lbl_points: 'points',
-        lbl_score_help: 'Mail scoring above this minus 9 gets rejected. Greylist at threshold − 1.5.',
-        lbl_greylist: 'Enable Greylisting',
-        lbl_rate_limit: 'Enable Rate Limiting',
-        lbl_burst: 'Burst',
-        lbl_rate: 'Rate',
-        lbl_whitelist_ip: 'Whitelist IPs (one per line)',
-        lbl_blacklist_dm: 'Blacklist Domains (one per line)',
-        btn_save_reload: 'Save & Reload Rspamd',
-        ttl_rsp_service: 'Rspamd Service',
-        ttl_cfg_summary: 'Current Config Summary',
-        row_enabled: 'Enabled',
-        row_req_score: 'Required Score',
-        row_greylist: 'Greylist',
-        row_rate_limit: 'Rate Limit',
-        row_whitelist: 'Whitelist IPs',
-        row_blacklist: 'Blacklist Domains',
-        lbl_local_ip: 'Local IP',
-        lbl_all_ips: 'All IPs',
-        lbl_sender: 'Sender',
-        lbl_recipient: 'Recipient',
-        lbl_date: 'Date',
-        lbl_status: 'Status',
-        lbl_all: 'All',
-        btn_filter: 'Filter',
-        btn_reset: 'Reset',
-        ttl_mail_log: 'Mail Log',
-        col_time: 'Time',
-        col_from: 'From',
-        col_to: 'To',
-        col_subject: 'Subject',
-        col_dest_ip: 'Dest IP',
-        col_local_ip: 'Local IP',
-        lbl_no_logs: 'No log entries match your filters.',
-        btn_clear_filter: 'Clear Filters',
-      }
-    };
-
-    // ── Language ─────────────────────────────────────────────────────────
-    let currentLang = localStorage.getItem('rp_lang') || 'vi';
-
-    function applyLang(lang) {
-      const dict = LANGS[lang];
-      document.querySelectorAll('[data-i18n]').forEach(el => {
-        const key = el.dataset.i18n;
-        if (dict[key] !== undefined) el.textContent = dict[key];
-      });
-      document.getElementById('langLabel').textContent = lang === 'vi' ? 'EN' : 'VI';
-    }
-
-    function toggleLang() {
-      currentLang = currentLang === 'vi' ? 'en' : 'vi';
-      localStorage.setItem('rp_lang', currentLang);
-      applyLang(currentLang);
-    }
-
-    // ── Theme ─────────────────────────────────────────────────────────────
-    let currentTheme = localStorage.getItem('rp_theme') || 'dark';
-
-    function applyTheme(theme) {
-      if (theme === 'light') {
-        document.body.classList.add('light');
-        document.getElementById('themeIcon').textContent = '🌙';
-      } else {
-        document.body.classList.remove('light');
-        document.getElementById('themeIcon').textContent = '☀';
-      }
-      document.documentElement.classList.remove('light-pre');
-    }
-
+    // Theme Toggle
     function toggleTheme() {
-      currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
-      localStorage.setItem('rp_theme', currentTheme);
-      applyTheme(currentTheme);
+      const html = document.documentElement;
+      const body = document.body;
+      const isLight = body.classList.toggle('light');
+      localStorage.setItem('rp_theme', isLight ? 'light' : 'dark');
+      document.getElementById('themeIcon').textContent = isLight ? '🌙' : '☀';
     }
 
-    // ── Live Clock ───────────────────────────────────────────────────────
+    // Live Clock
     function updateClock() {
       const now = new Date();
-      document.getElementById('clock').textContent =
-        now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      document.getElementById('clock').textContent = now.toLocaleTimeString('en-GB');
     }
-
-    // ── Init ─────────────────────────────────────────────────────────────
-    applyTheme(currentTheme);
-    applyLang(currentLang);
-    updateClock();
     setInterval(updateClock, 1000);
+    updateClock();
 
-    // Auto-dismiss flash messages
-    setTimeout(() => {
-      document.querySelectorAll('.flash').forEach(el => {
-        el.style.transition = 'opacity 0.5s';
-        el.style.opacity = '0';
-        setTimeout(() => el.remove(), 500);
-      });
-    }, 4000);
+    // Init theme icon
+    window.addEventListener('DOMContentLoaded', () => {
+      const isLight = document.body.classList.contains('light');
+      document.getElementById('themeIcon').textContent = isLight ? '🌙' : '☀';
+      
+      // Auto-dismiss flashes
+      setTimeout(() => {
+        document.querySelectorAll('.flash').forEach(f => {
+          f.style.opacity = '0';
+          f.style.transform = 'translateX(20px)';
+          setTimeout(() => f.remove(), 300);
+        });
+      }, 5000);
+    });
   </script>
 
   {% block scripts %}{% endblock %}
 </body>
-
 </html>

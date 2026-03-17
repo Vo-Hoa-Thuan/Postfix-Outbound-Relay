@@ -83,7 +83,7 @@ def _parse_timestamp(month: str, day: str, t: str, year: Optional[str] = None) -
     y = year if year else _current_year()
     return f"{y}-{m:02d}-{int(day):02d} {t}"
 
-def parse_maillog(limit: int = 1000) -> None:
+def parse_maillog(limit: int = 500) -> None:
     """
     Main entry point. We will try to read from journalctl primarily for Postfix
     and then files for Kerio/System logs.
@@ -91,10 +91,10 @@ def parse_maillog(limit: int = 1000) -> None:
     state = _read_state()
     if "qid_map" not in state: state["qid_map"] = {}
     
-    # Priority 1: Journalctl (Real-time for Postfix on modern systems)
-    _parse_journal(limit, state)
+    # Priority 1: Journalctl (Incremental using Cursor)
+    _parse_journal_incremental(state)
     
-    # Priority 2: Files (Kerio, older systems)
+    # Priority 2: Files (Incremental using Offsets)
     log_paths = [
         "/home/rescopykeriofirst/store/logs/mail.log",
         "/opt/kerio/mailserver/store/logs/mail.log",
@@ -105,40 +105,56 @@ def parse_maillog(limit: int = 1000) -> None:
     if found_logs:
         _parse_files(found_logs, limit, state)
         
-    # Periodic cleanup of old QID mappings (keep last 500)
-    if len(state["qid_map"]) > 500:
-        # Simple pop from start
+    # Cleanup QID mappings
+    if len(state["qid_map"]) > 1000:
         ks = list(state["qid_map"].keys())
-        for k in ks[:200]: state["qid_map"].pop(k)
+        for k in ks[:500]: state["qid_map"].pop(k)
         
     _write_state(state)
 
-def _parse_journal(limit: int, state: dict) -> None:
+def _parse_journal_incremental(state: dict) -> None:
+    """Read only NEW journal entries since the last recorded cursor."""
     try:
-        # Read a good chunk of recent history to ensure we catch both QID/From and Sent lines
-        cmd = ["journalctl", "-u", "postfix", "-n", str(limit * 2), "--no-pager"]
-        output = subprocess.check_output(cmd, encoding="utf-8", errors="replace")
+        cursor = state.get("journal_cursor")
+        cmd = ["journalctl", "-u", "postfix", "--no-pager", "-o", "json"]
+        if cursor:
+            cmd += ["--after-cursor", cursor]
+        else:
+            cmd += ["-n", "1000"] # First run, get some history
+
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
+        stdout, _ = proc.communicate()
         
-        # Track which lines we've already parsed to avoid duplicates in the same run
-        # Note: journal parsing here is simplified without strict offset to ensure reliability
         entries = []
-        for line in output.splitlines():
-            # 1. Update QID Map
-            mq = RE_QID_FROM.search(line)
-            if mq:
-                state["qid_map"][mq.group("qid")] = mq.group("from")
-                continue
+        new_cursor = cursor
+        
+        for line in stdout.splitlines():
+            try:
+                msg_json = json.loads(line)
+                new_cursor = msg_json.get("__CURSOR")
+                msg_text = msg_json.get("MESSAGE", "")
                 
-            # 2. Parse Lines
-            entry = _parse_line(line, state["qid_map"])
-            if entry:
-                entries.append(entry)
+                # Update QID Map
+                mq = RE_QID_FROM.search(msg_text)
+                if mq:
+                    state["qid_map"][mq.group("qid")] = mq.group("from")
+                    continue
+                    
+                entry = _parse_line(msg_text, state["qid_map"])
+                if entry:
+                    entries.append(entry)
+            except:
+                pass
         
         if entries:
             _save_entries(entries)
-            print(f"[LogReader] Journal: Captured {len(entries)} events.")
+            print(f"[LogReader] Journal: Incremental {len(entries)} events.")
+        
+        if new_cursor:
+            state["journal_cursor"] = new_cursor
+            
     except Exception as e:
-        print(f"[LogReader] Journal error: {e}")
+        print(f"[LogReader] Journal incremental error: {e}")
 
 def _parse_files(target_logs: list, limit_per_file: int, state: dict) -> None:
     if "offsets" not in state: state["offsets"] = {}
@@ -234,11 +250,75 @@ def _parse_line(line: str, qid_map: Dict[str, str]) -> Optional[dict]:
     return None
 
 def _save_entries(entries: list) -> None:
-    # Basic deduplication: don't write if same time+qid+to combo already exists in last 50 lines of parsed.log
-    # (Simplified: just write for now, dashboard handles display)
     with open(PARSED_LOG, "a", encoding="utf-8") as out:
         for e in entries:
             out.write(json.dumps(e, ensure_ascii=False) + "\n")
 
+# ── Chart Aggregator ────────────────────────────────────────────────────────
+CHART_CACHE_FILE = os.path.join(BASE_DIR, "runtime", "chart_cache.json")
+
+def pre_aggregate_chart():
+    """Build a 24h summary from parsed.log and cache it to disk."""
+    import datetime
+    if not os.path.exists(PARSED_LOG):
+        return
+        
+    now = datetime.datetime.now()
+    hours_labels = []
+    # Key = "YYYY-MM-DD HH", Value = {"sent": 0, "deferred": 0, "bounced": 0}
+    chart_data = {}
+    
+    for i in range(23, -1, -1):
+        h_time = now - datetime.timedelta(hours=i)
+        label = h_time.strftime("%H:00")
+        prefix = h_time.strftime("%Y-%m-%d %H")
+        hours_labels.append({"label": label, "prefix": prefix})
+        chart_data[prefix] = {"sent": 0, "deferred": 0, "bounced": 0}
+        
+    oldest_prefix = hours_labels[0]["prefix"]
+    
+    try:
+        # We only really care about the last ~10-20MB of this file for chart
+        file_size = os.path.getsize(PARSED_LOG)
+        read_start = max(0, file_size - (1024 * 1024 * 10)) # Last 10MB
+        
+        with open(PARSED_LOG, "r", encoding="utf-8") as f:
+            if read_start > 0:
+                f.seek(read_start)
+                f.readline() # Skip partial line
+                
+            for line in f:
+                line = line.strip()
+                if not line: continue
+                try:
+                    entry = json.loads(line)
+                    log_time = entry.get("time", "")
+                    status = entry.get("status", "")
+                    if len(log_time) >= 13:
+                        prefix = log_time[:13]
+                        if prefix >= oldest_prefix and prefix in chart_data:
+                            if status in ["sent", "deferred", "bounced"]:
+                                chart_data[prefix][status] += 1
+                except: pass
+                
+        # Format arrays
+        result = {
+            "updated_at": time.time(),
+            "labels": [h["label"] for h in hours_labels],
+            "datasets": {
+                "sent": [chart_data[h["prefix"]]["sent"] for h in hours_labels],
+                "deferred": [chart_data[h["prefix"]]["deferred"] for h in hours_labels],
+                "bounced": [chart_data[h["prefix"]]["bounced"] for h in hours_labels],
+            }
+        }
+        
+        os.makedirs(os.path.dirname(CHART_CACHE_FILE), exist_ok=True)
+        with open(CHART_CACHE_FILE, "w") as f:
+            json.dump(result, f)
+            
+    except Exception as e:
+        print(f"[LogReader] Chart Aggregation error: {e}")
+
 if __name__ == "__main__":
     parse_maillog()
+    pre_aggregate_chart()

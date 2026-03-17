@@ -1,142 +1,147 @@
 {% extends "base.html" %}
 {% set active_page = "settings" %}
 
-{% block title %}Settings – Postfix Relay Panel{% endblock %}
-{% block page_title %}System Settings{% endblock %}
+{% block title %}System Settings – Operations Console{% endblock %}
 
 {% block content %}
-<div class="card form-card">
-    <h2 class="card-title">Panel Settings</h2>
-    <form action="/settings/save" method="post" class="form-grid">
-        <div class="section-header" style="grid-column: 1 / -1; margin-top: 10px;">
-            <h3>MXToolbox Integration</h3>
-        </div>
+<div class="section-header" style="margin-bottom: 2rem;">
+    <h2 style="color: var(--accent); font-size: 1.1rem; letter-spacing: 0.1em; text-transform: uppercase;" data-i18n="ttl_core_settings">⚙️ Core Infrastructure Settings</h2>
+</div>
+
+<form action="/settings/save" method="post">
+    <div class="dashboard-grid">
         
-        <div class="form-group" style="grid-column: 1 / -1;">
-            <label>API Key</label>
-            <input type="text" name="mxtoolbox_api_key" value="{{ settings.mxtoolbox_api_key }}" placeholder="Enter MXToolbox API Key" class="form-input" />
-            <small class="muted">Used for automatic IP Blacklist checking.</small>
-        </div>
-        
-        <div class="form-group" style="grid-column: 1 / -1;">
-            <label>Automatic Blacklist Check Interval (Hours)</label>
-            <input type="number" name="blacklist_check_interval" value="{{ settings.blacklist_check_interval or 12 }}" min="1" class="form-input" />
-            <small class="muted">How often the system should automatically check all IPs against blacklists.</small>
-        </div>
-
-        <div class="section-header" style="grid-column: 1 / -1; margin-top: 20px;">
-            <h3>Email Alerting (SMTP)</h3>
-        </div>
-
-        <div class="form-group form-check-group" style="grid-column: 1 / -1;">
-            <label class="toggle-label">
-                <input type="checkbox" name="alert_enabled" value="on" {% if settings.alert_email.enabled %}checked{% endif %} class="toggle-input" />
-                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                <span>Enable Email Alerts</span>
-            </label>
-        </div>
-
-        <div class="form-group">
-            <label>SMTP Host</label>
-            <input type="text" name="smtp_host" value="{{ settings.alert_email.smtp_host }}" class="form-input" />
-        </div>
-        
-        <div class="form-group">
-            <label>SMTP Port</label>
-            <input type="number" name="smtp_port" value="{{ settings.alert_email.smtp_port }}" class="form-input" />
-        </div>
-
-        <div class="form-group">
-            <label>SMTP User (optional)</label>
-            <input type="text" name="smtp_user" value="{{ settings.alert_email.smtp_user }}" class="form-input" />
-        </div>
-        
-        <div class="form-group">
-            <label>SMTP Pass (optional)</label>
-            <input type="password" name="smtp_pass" value="{{ settings.alert_email.smtp_pass }}" class="form-input" />
-        </div>
-
-        <div class="form-group">
-            <label>From Email</label>
-            <input type="email" name="from_email" value="{{ settings.alert_email.from_email }}" class="form-input" />
-        </div>
-        
-        <div class="form-group">
-            <label>To Email</label>
-            <input type="email" name="to_email" value="{{ settings.alert_email.to_email }}" class="form-input" />
-        </div>
-
-        <div class="section-header" style="grid-column: 1 / -1; margin-top: 20px;">
-            <!-- ── Postfix Global Identity ───────────────────────────────────── -->
-            <h3>Postfix Global Identity</h3>
-        </div>
-        <div class="card mt-2" style="grid-column: 1 / -1;">
-            <p class="muted small mb-1">Set the primary hostname and domain for the mail server. This is used in HELO/EHLO and SPF/DKIM validation.</p>
-            <div class="form-grid">
-                <div class="form-group">
-                    <label>My Hostname (myhostname)</label>
-                    <input type="text" name="myhostname" value="{{ postfix_identity.myhostname }}" placeholder="mail.yourdomain.com" class="form-input">
+        <!-- Left Column: Core Configuration -->
+        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+            
+            <div class="ops-card">
+                <div class="ops-card-header">
+                    <h3 class="ops-card-title" data-i18n="ttl_mx_intel">MXToolbox Intelligence</h3>
                 </div>
-                <div class="form-group">
-                    <label>My Domain (mydomain)</label>
-                    <input type="text" name="mydomain" value="{{ postfix_identity.mydomain }}" placeholder="yourdomain.com" class="form-input">
+                <div class="ops-card-body">
+                    <div class="form-group">
+                        <label data-i18n="lbl_mxtoolbox_api">MXToolbox API Key</label>
+                        <input type="text" name="mxtoolbox_api_key" value="{{ settings.get('mxtoolbox_api_key', '') }}" placeholder="Your API Key" class="form-input" data-i18n="[placeholder]ph_api_key" />
+                        <small class="text-muted" data-i18n="txt_dnsbl_sync_d">Required for automated DNSBL (Blacklist) synchronization.</small>
+                    </div>
+                    <div class="form-group">
+                        <label data-i18n="lbl_check_freq">Blacklist Scan Frequency (Hours)</label>
+                        <input type="number" name="blacklist_check_interval" value="{{ settings.blacklist_check_interval or 12 }}" min="1" class="form-input" />
+                        <small class="text-muted" data-i18n="txt_bg_cycle">Background cycle for global reputation checks.</small>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div class="section-header" style="grid-column: 1 / -1; margin-top: 20px;">
-            <!-- ── Relay Access Control ────────────────────────────────────── -->
-            <h3>Relay Access Control</h3>
-        </div>
-        <div class="card mt-2" style="grid-column: 1 / -1;">
-            <p class="muted small mb-1">List of IP addresses or CIDR networks that are allowed to relay mail through this server without authentication. <b>Separate by spaces or commas.</b></p>
-            <div class="form-group">
-                <label>Trusted Relay IPs (mynetworks)</label>
-                <textarea name="mynetworks" class="form-input" rows="3" placeholder="127.0.0.0/8, 103.27.61.218">{{ mynetworks }}</textarea>
-                <p class="small text-info mt-1">💡 Add your external server's IP (e.g., 103.27.61.218) here to fix "Relay access denied".</p>
+            <div class="ops-card">
+                <div class="ops-card-header">
+                    <h3 class="ops-card-title" data-i18n="ttl_alert_sys">Alert Notification System</h3>
+                </div>
+                <div class="ops-card-body">
+                    <div class="form-group">
+                        <label class="toggle-label" style="justify-content: flex-start; gap: 1rem;">
+                            <input type="checkbox" name="alert_enabled" value="on" {% if settings.alert_email.enabled %}checked{% endif %} class="toggle-input" />
+                            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                            <span data-i18n="lbl_enable_alerts">Enable Global Email Alerts</span>
+                        </label>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label data-i18n="lbl_smtp_smart">SMTP Smart Host</label>
+                            <input type="text" name="smtp_host" value="{{ settings.alert_email.smtp_host }}" placeholder="smtp.gmail.com" class="form-input" data-i18n="ph_smtp_host" />
+                        </div>
+                        <div class="form-group">
+                            <label data-i18n="lbl_port">Port</label>
+                            <input type="number" name="smtp_port" value="{{ settings.alert_email.smtp_port }}" placeholder="587" class="form-input" data-i18n="ph_smtp_port" />
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label data-i18n="lbl_smtp_user">SMTP Username</label>
+                            <input type="text" name="smtp_user" value="{{ settings.alert_email.smtp_user }}" class="form-input" />
+                        </div>
+                        <div class="form-group">
+                            <label data-i18n="lbl_smtp_pass">SMTP Password</label>
+                            <input type="password" name="smtp_pass" value="{{ settings.alert_email.smtp_pass }}" class="form-input" />
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label data-i18n="lbl_env_from">Envelope From</label>
+                            <input type="email" name="from_email" value="{{ settings.alert_email.from_email }}" class="form-input" />
+                        </div>
+                        <div class="form-group">
+                            <label data-i18n="lbl_recip_addr">Recipient Address</label>
+                            <input type="email" name="to_email" value="{{ settings.alert_email.to_email }}" class="form-input" />
+                        </div>
+                    </div>
+                </div>
             </div>
+
         </div>
 
-        <div class="section-header" style="grid-column: 1 / -1; margin-top: 20px;">
-            <!-- ── Postfix Relay Limits ───────────────────────────────────────── -->
+        <!-- Right Column: Postfix & Performance -->
+        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+            
+            <div class="ops-card" style="border-top: 4px solid var(--accent);">
+                <div class="ops-card-header">
+                    <h3 class="ops-card-title" data-i18n="ttl_mta_id">MTA Identity (Postfix)</h3>
+                </div>
+                <div class="ops-card-body">
+                    <div class="form-group">
+                        <label data-i18n="lbl_node_host">Node Hostname (myhostname)</label>
+                        <input type="text" name="myhostname" value="{{ postfix_identity.myhostname }}" placeholder="mta1.domain.com" class="form-input" data-i18n="ph_mta_host" />
+                    </div>
+                    <div class="form-group">
+                        <label data-i18n="lbl_ops_domain">Operational Domain (mydomain)</label>
+                        <input type="text" name="mydomain" value="{{ postfix_identity.mydomain }}" placeholder="domain.com" class="form-input" data-i18n="ph_mta_domain" />
+                    </div>
+                    <div class="form-group">
+                        <label data-i18n="lbl_trusted_net">Trusted Relay Networks (mynetworks)</label>
+                        <textarea name="mynetworks" rows="4" class="form-input mono" style="font-size: 0.8rem;">{{ mynetworks }}</textarea>
+                        <small class="text-muted" data-i18n="txt_cidr_note">Separate CIDR ranges by commas or spaces. Critical for preventing unauthorized relay.</small>
+                    </div>
+                </div>
+            </div>
 
-        <div class="form-group">
-            <label>SMTPD Recipient Limit</label>
-            <input type="number" name="recipient_limit" value="{{ postfix_limits.smtpd_recipient_limit }}" class="form-input" />
-            <small class="muted">Max recipients per message.</small>
+            <div class="ops-card">
+                <div class="ops-card-header">
+                    <h3 class="ops-card-title" data-i18n="ttl_perf_tuning">Performance Tuning</h3>
+                </div>
+                <div class="ops-card-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label data-i18n="lbl_max_recip">Max Recipients</label>
+                            <input type="number" name="recipient_limit" value="{{ postfix_limits.smtpd_recipient_limit }}" class="form-input" />
+                        </div>
+                        <div class="form-group">
+                            <label data-i18n="lbl_max_msg_size">Max Msg Size (MB)</label>
+                            <input type="number" name="message_size" value="{{ (postfix_limits.message_size_limit | int / 1024 / 1024) | round(0) | int }}" class="form-input" />
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label data-i18n="lbl_concur_limit">Concurrency Limit</label>
+                        <input type="number" name="dest_concurrency" value="{{ postfix_limits.default_destination_concurrency_limit }}" class="form-input" />
+                        <small class="text-muted" data-i18n="txt_concur_d">Simultaneous sessions per target domain.</small>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg btn-full" style="height: 60px; font-size: 1.1rem; box-shadow: 0 4px 20px rgba(0,0,0,0.5);" data-i18n="btn_sync_cfg">💾 Synchronize Configuration</button>
+
         </div>
 
-        <div class="form-group">
-            <label>Message Size Limit (Bytes)</label>
-            <input type="number" name="message_size" value="{{ postfix_limits.message_size_limit }}" class="form-input" />
-            <small class="muted">Max size of a single email.</small>
-        </div>
+    </div>
+</form>
 
-        <div class="form-group">
-            <label>Destination Concurrency</label>
-            <input type="number" name="dest_concurrency" value="{{ postfix_limits.default_destination_concurrency_limit }}" class="form-input" />
-            <small class="muted">Concurrent connections to same domain.</small>
-        </div>
-
-        <div class="form-group">
-            <label>Destination Recipient Limit</label>
-            <input type="number" name="dest_recipient_limit" value="{{ postfix_limits.default_destination_recipient_limit }}" class="form-input" />
-            <small class="muted">Recipients per connection to same domain.</small>
-        </div>
-
-        <div class="form-actions" style="grid-column: 1 / -1; justify-content: flex-start; gap: 10px; margin-top: 20px;">
-            <button type="submit" class="btn btn-primary">Save All Settings</button>
-        </div>
-    </form>
-    
-    <hr style="margin: 20px 0; border: 0; border-top: 1px solid var(--border);" />
-    
-    <div style="grid-column: 1 / -1;">
-        <h3>Test Alerts</h3>
-        <p class="muted">Send a test notification using the saved configurations.</p>
-        <form action="/settings/test-email" method="post" style="margin-top: 10px;">
-            <button type="submit" class="btn btn-secondary">Send Test Email</button>
+<div class="ops-card" style="margin-top: 2rem; background: var(--bg-hover);">
+    <div class="ops-card-header">
+        <h3 class="ops-card-title" data-i18n="ttl_maint_verif">Maintenance & Verification</h3>
+    </div>
+    <div class="ops-card-body" style="display: flex; gap: 1rem;">
+        <form action="/settings/test-email" method="post">
+            <button type="submit" class="btn btn-secondary" data-i18n="btn_test_dispatch">📨 Test Alert Dispatch</button>
         </form>
     </div>
 </div>
+
 {% endblock %}

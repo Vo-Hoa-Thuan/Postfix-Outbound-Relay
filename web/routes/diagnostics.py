@@ -21,9 +21,6 @@ async def diagnostics_home(request: Request, msg: str = "", error: str = ""):
     queue = get_queue_status()
     identity = get_postfix_identity()
     
-    # Simple DNS check for SPF (optional but helpful)
-    # We can add actual DNS lookup here if needed later
-    
     return templates.TemplateResponse("diagnostics.html", {
         "request": request,
         "queue": queue,

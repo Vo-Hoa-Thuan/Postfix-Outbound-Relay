@@ -1,84 +1,92 @@
 {% extends "base.html" %}
 {% set active_page = "rotation" %}
 
-{% block title %}IP Rotation – Postfix Relay Panel{% endblock %}
-{% block page_title %}IP Rotation Settings{% endblock %}
+{% block title %}IP Rotation – Operations Console{% endblock %}
 
 {% block content %}
+<div class="section-header" style="margin-bottom: 2rem;">
+    <h2 style="color: var(--accent); font-size: 1.1rem; letter-spacing: 0.1em; text-transform: uppercase;" data-i18n="ttl_rotation_lb">🔄 Rotation & Load Balancing</h2>
+</div>
 
-<div class="layout-2col">
-
-    <!-- ── Config Form ──────────────────────────────────────────────────── -->
-    <div class="card form-card">
-        <h2 class="card-title" data-i18n="ttl_rot_config">Rotation Configuration</h2>
-        <form action="/rotation/save" method="post" class="form-stack">
-
-            <div class="form-group">
-                <label data-i18n="lbl_rot_interval">Rotation Interval</label>
-                <div class="preset-btns">
-                    <button type="button" class="btn btn-xs btn-secondary"
-                        onclick="setRotationInterval(10)">10s</button>
-                    <button type="button" class="btn btn-xs btn-secondary"
-                        onclick="setRotationInterval(30)">30s</button>
-                    <button type="button" class="btn btn-xs btn-secondary" onclick="setRotationInterval(60)">1m</button>
-                    <button type="button" class="btn btn-xs btn-secondary"
-                        onclick="setRotationInterval(300)">5m</button>
-                    <button type="button" class="btn btn-xs btn-secondary"
-                        onclick="setRotationInterval(600)">10m</button>
-                    <button type="button" class="btn btn-xs btn-secondary"
-                        onclick="setRotationInterval(1800)">30m</button>
-                    <button type="button" class="btn btn-xs btn-secondary"
-                        onclick="setRotationInterval(3600)">1h</button>
+<div class="dashboard-grid">
+    
+    <!-- Left Column: Config Panel -->
+    <div class="ops-card">
+        <div class="ops-card-header">
+            <h3 class="ops-card-title" data-i18n="ttl_strategy">Strategy Configuration</h3>
+        </div>
+        <div class="ops-card-body">
+            <form action="/rotation/save" method="post">
+                <div class="form-group">
+                    <label data-i18n="lbl_sch_interval">Scheduling Interval</label>
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-secondary btn-xs" onclick="setIntervalVal(15)">15s</button>
+                        <button type="button" class="btn btn-secondary btn-xs" onclick="setIntervalVal(30)">30s</button>
+                        <button type="button" class="btn btn-secondary btn-xs" onclick="setIntervalVal(60)">1m</button>
+                        <button type="button" class="btn btn-secondary btn-xs" onclick="setIntervalVal(300)">5m</button>
+                        <button type="button" class="btn btn-secondary btn-xs" onclick="setIntervalVal(3600)">1h</button>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <input type="number" name="rotation_seconds" id="rotSecs" value="{{ rotation_secs }}" min="10" class="form-input" style="width: 120px;" />
+                        <span class="text-muted" data-i18n="lbl_seconds">seconds</span>
+                    </div>
+                    <small class="text-muted" style="display: block; margin-top: 0.5rem; font-style: italic;" data-i18n="txt_rot_note">Note: Short intervals (15-30s) effectively create a Round-Robin load balanced environment.</small>
                 </div>
-                <small class="muted" style="display:block; margin-top:5px;">Tip: Setting interval to 10s-30s simulates Load Balancing across multiple IPs.</small>
-                <div class="input-suffix">
-                    <input type="number" name="rotation_seconds" id="rotSecs" value="{{ rotation_secs }}" min="10"
-                        class="form-input" />
-                    <span class="suffix-label" data-i18n="lbl_seconds">seconds</span>
-                </div>
-            </div>
 
-            <div class="form-group">
-                <label data-i18n="lbl_rot_mode">Rotation Mode</label>
-                <div class="radio-group">
-                    <label class="radio-option {% if mode == 'weighted' %}selected{% endif %}">
-                        <input type="radio" name="mode" value="weighted" {% if mode=='weighted' %}checked{% endif %} />
-                        <span class="radio-box">
-                            <strong data-i18n="mode_weighted">Weighted</strong>
-                            <small data-i18n="mode_weighted_d">IPs with higher weight are selected more often</small>
-                        </span>
-                    </label>
-                    <label class="radio-option {% if mode == 'roundrobin' %}selected{% endif %}">
-                        <input type="radio" name="mode" value="roundrobin" {% if mode=='roundrobin' %}checked{% endif
-                            %} />
-                        <span class="radio-box">
-                            <strong data-i18n="mode_rr">Round Robin</strong>
-                            <small data-i18n="mode_rr_d">IPs selected equally in strict rotation order</small>
-                        </span>
-                    </label>
+                <div class="form-group" style="margin-top: 2rem;">
+                    <label data-i18n="lbl_algo">Selection Algorithm</label>
+                    <div style="display: flex; flex-direction: column; gap: 1rem;">
+                        <label class="toggle-label" style="justify-content: flex-start; gap: 1rem;">
+                            <input type="radio" name="mode" value="weighted" {% if mode == 'weighted' %}checked{% endif %} />
+                            <div style="display: flex; flex-direction: column;">
+                                <span style="font-weight: 700; color: var(--text-primary);" data-i18n="lbl_weighted">Weighted Selection</span>
+                                <span class="text-muted" style="font-size: 0.8rem;" data-i18n="lbl_weighted_d">Priority given to healthy IPs with higher weights.</span>
+                            </div>
+                        </label>
+                        <label class="toggle-label" style="justify-content: flex-start; gap: 1rem;">
+                            <input type="radio" name="mode" value="roundrobin" {% if mode == 'roundrobin' %}checked{% endif %} />
+                            <div style="display: flex; flex-direction: column;">
+                                <span style="font-weight: 700; color: var(--text-primary);" data-i18n="lbl_rr">Strict Round-Robin</span>
+                                <span class="text-muted" style="font-size: 0.8rem;" data-i18n="lbl_rr_d">Iterates through all healthy IPs in exact order.</span>
+                            </div>
+                        </label>
+                    </div>
                 </div>
-            </div>
 
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary" data-i18n="btn_save_set">Save Settings</button>
-            </div>
-        </form>
+                <div class="form-actions" style="margin-top: 2.5rem; border-top: 1px solid var(--border); padding-top: 1.5rem;">
+                    <button type="submit" class="btn btn-primary btn-lg btn-full" data-i18n="btn_apply_policy">🚀 Apply Rotation Policy</button>
+                </div>
+            </form>
+        </div>
     </div>
 
-    <!-- ── Status Panel ─────────────────────────────────────────────────── -->
-    <div>
-        <div class="card stat-card-lg">
-            <div class="stat-label" data-i18n="lbl_next_rot_in">Next Rotation In</div>
-            <div class="stat-value-xl" id="countdown">{{ time_remaining }}s</div>
-            <div class="stat-sub">Interval: {{ rotation_secs }}s · Mode: {{ mode }}</div>
+    <!-- Right Column: Live Status -->
+    <div style="display: flex; flex-direction: column; gap: 1.5rem; position: sticky; top: calc(var(--nav-h) + 2rem);">
+        <div class="ops-card" style="border-top: 4px solid var(--accent); background: linear-gradient(135deg, var(--bg-surface), var(--bg-elevated));">
+            <div class="ops-card-header">
+                <h3 class="ops-card-title" data-i18n="ttl_next_rot">Next Rotation</h3>
+            </div>
+            <div class="ops-card-body" style="padding: 2rem; text-align: center;">
+                <div id="countdown" style="font-size: 3rem; font-weight: 800; color: var(--accent); font-family: var(--ff-mono); text-shadow: 0 0 20px var(--accent-glow);">
+                    {{ time_remaining }}s
+                </div>
+                <div class="text-muted mt-1" style="font-size: 0.85rem; letter-spacing: 0.05em;" data-i18n="lbl_timer_active">TIMER ACTIVE</div>
+                <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border-light); font-size: 0.8rem; color: var(--text-secondary);">
+                    <span data-i18n="lbl_curr_strat">Current Strategy</span>: <span class="badge badge-blue" data-i18n="status_{{ mode.lower() }}">{{ mode | upper }}</span>
+                </div>
+            </div>
         </div>
 
-        <div class="card mt-2">
-            <h3 class="card-title" data-i18n="ttl_manual_rot">Manual Rotation</h3>
-            <p class="muted mb-2" data-i18n="txt_manual_rot">Force an immediate IP rotation, bypassing the timer.</p>
-            <form action="/rotation/trigger" method="post">
-                <button type="submit" class="btn btn-accent btn-full" data-i18n="btn_rotate_now">⟳ Rotate Now</button>
-            </form>
+        <div class="ops-card">
+            <div class="ops-card-header">
+                <h3 class="ops-card-title" data-i18n="ttl_manual_int">Manual Intervention</h3>
+            </div>
+            <div class="ops-card-body">
+                <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 1.25rem;" data-i18n="txt_manual_int">Force immediate IP switch regardless of the timer state.</p>
+                <form action="/rotation/trigger" method="post">
+                    <button type="submit" class="btn btn-secondary btn-full" data-i18n="btn_rotate_imm">⟳ Rotate Immediately</button>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -86,26 +94,20 @@
 {% endblock %}
 
 {% block scripts %}
-<meta name="rotation-remaining" content="{{ time_remaining }}">
 <script>
-    function setRotationInterval(val) {
-        document.getElementById('rotSecs').value = val;
-    }
+    function setIntervalVal(v) { document.getElementById('rotSecs').value = v; }
 
-    let remaining = parseInt(document.querySelector('meta[name="rotation-remaining"]').content, 10);
+    let remaining = {{ time_remaining }};
     const el = document.getElementById('countdown');
     function tick() {
-        if (remaining > 0) { remaining--; el.textContent = remaining + 's'; }
-        else { el.textContent = 'Rotating...'; }
+        const t = translations[localStorage.getItem('rp_lang') || 'vn'];
+        if (remaining > 0) {
+            remaining--;
+            el.textContent = remaining + 's';
+        } else {
+            el.textContent = t['status_pending'];
+        }
     }
-    window.setInterval(tick, 1000);
-
-    // Highlight radio on click
-    document.querySelectorAll('.radio-option input').forEach(inp => {
-        inp.addEventListener('change', () => {
-            document.querySelectorAll('.radio-option').forEach(l => l.classList.remove('selected'));
-            inp.closest('.radio-option').classList.add('selected');
-        });
-    });
+    setInterval(tick, 1000);
 </script>
 {% endblock %}

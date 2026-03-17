@@ -1,269 +1,254 @@
 {% extends "base.html" %}
 {% set active_page = "rspamd" %}
 
-{% block title %}Rspamd Config – Postfix Relay Panel{% endblock %}
-{% block page_title %}Rspamd Configuration{% endblock %}
+{% block title %}Rspamd Configuration – Operations Console{% endblock %}
 
 {% block content %}
+<div class="section-header">
+    <h2 style="color: var(--accent); font-size: 1.1rem; letter-spacing: 0.1em; text-transform: uppercase;" data-i18n="ttl_rspamd_main">🛡️ Anti-Spam (Rspamd) Operational Control</h2>
+</div>
 
 <form action="/rspamd/save" method="post" id="rspamdForm">
-    <div class="layout-2col">
-
-        <!-- ── Left Column: Configuration ───────────────────────────────────── -->
-        <div class="card form-card">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2 class="card-title" data-i18n="ttl_filter_set" style="margin-bottom: 0;">Advanced Filtering</h2>
-                <label class="toggle-label">
-                    <input type="checkbox" name="enable" value="on" {% if cfg.get('enable', True) %}checked{% endif %} class="toggle-input" />
-                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                    <span style="font-weight: bold; margin-left: 8px;">Enabled</span>
-                </label>
+    <div class="dashboard-grid">
+        
+        <!-- Left Column: All Settings (Consolidated) -->
+        <div class="rspamd-ops-layout">
+            
+            <!-- 1. Status & Master Toggle -->
+            <div class="ops-section" style="border-left: 5px solid var(--accent);">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h3 class="ops-section-title" data-i18n="ttl_master_filter">Master Filtering</h3>
+                        <p class="text-muted" style="font-size: 0.85rem;" data-i18n="txt_master_filter_d">Global enable/disable for Rspamd integration.</p>
+                    </div>
+                    <label class="toggle-label">
+                        <input type="checkbox" name="enable" value="on" {% if cfg.get('enable', True) %}checked{% endif %} class="toggle-input" />
+                        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                        <span style="font-weight: bold; margin-left: 8px;" data-i18n="lbl_enabled">ENABLED</span>
+                    </label>
+                </div>
             </div>
 
-            <div class="tabs">
-                <div class="tabs-header">
-                    <button type="button" class="tab-btn active" onclick="openTab(event, 'tab-general')">General</button>
-                    <button type="button" class="tab-btn" onclick="openTab(event, 'tab-security')">Security</button>
-                    <button type="button" class="tab-btn" onclick="openTab(event, 'tab-lists')">Lists</button>
-                    <button type="button" class="tab-btn" onclick="openTab(event, 'tab-lua')">Custom Lua</button>
+            <!-- 2. General Filtering -->
+            <div class="ops-section">
+                <div class="ops-section-header">
+                    <h3 class="ops-section-title" data-i18n="ttl_filter_param">General Filtering</h3>
                 </div>
-
-                <div class="tab-content" id="tab-general" style="display: block;">
-                    <!-- Required Score -->
+                <div class="form-row">
                     <div class="form-group">
                         <label data-i18n="lbl_reject_score">Reject Score Threshold</label>
-                        <div class="input-suffix">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
                             <input type="number" name="required_score" step="0.1" min="1" max="20"
-                                value="{{ cfg.get('required_score', 6.0) }}" class="form-input" />
-                            <span class="suffix-label" data-i18n="lbl_points">points</span>
+                                 value="{{ cfg.get('required_score', 6.0) }}" class="form-input" style="width: 100px;" />
+                            <span class="text-muted" data-i18n="lbl_points">points</span>
                         </div>
-                        <small class="help-text">Mail scoring above this + 9 gets rejected. Greylisting at threshold − 1.5.</small>
+                        <small class="text-muted" data-i18n="txt_reject_score_d">Score above this +9 = Reject. Greylist = threshold − 1.5.</small>
                     </div>
-
-                    <div class="form-group form-check-group">
-                        <label class="toggle-label">
+                    <div class="form-group">
+                        <label data-i18n="lbl_inbound_ctrl">Inbound Controls</label>
+                        <label class="toggle-label" style="margin-top: 0.5rem;">
                             <input type="checkbox" name="greylist" value="on" {% if cfg.get('greylist', True) %}checked{% endif %} class="toggle-input" />
                             <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                            <span><strong>Enable Greylisting</strong></span>
+                            <span data-i18n="lbl_greylist">Enable Greylisting</span>
                         </label>
-                    </div>
-
-                    <hr class="divider" />
-
-                    <!-- Rate Limit -->
-                    <h3 style="margin: 20px 0 10px 0;">Rate Limiting</h3>
-                    <div class="form-group form-check-group">
-                        <label class="toggle-label">
-                            <input type="checkbox" name="rl_enable" value="on" {% if cfg.get('rate_limit', {}).get('enable', True) %}checked{% endif %} class="toggle-input" />
-                            <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                            <span><strong>Enable Rate Limiting</strong></span>
-                        </label>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label data-i18n="lbl_burst">Burst (Max items)</label>
-                            <input type="number" name="rl_burst" min="1" value="{{ cfg.get('rate_limit', {}).get('burst', 100) }}" class="form-input" />
-                        </div>
-                        <div class="form-group">
-                            <label data-i18n="lbl_rate">Rate Frequency</label>
-                            <input type="text" name="rl_rate" value="{{ cfg.get('rate_limit', {}).get('rate', '50 / 1min') }}" placeholder="e.g. 50 / 1min" class="form-input" />
-                        </div>
-                    </div>
-                </div>
-
-                <div class="tab-content" id="tab-security" style="display: none;">
-                    <!-- Virus Scan -->
-                    <div class="security-card">
-                        <div class="form-group form-check-group">
-                            <label class="toggle-label">
-                                <input type="checkbox" name="vs_enable" value="on" {% if cfg.get('virus_scan', {}).get('enable') %}checked{% endif %} class="toggle-input" />
-                                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                                <span><strong>Virus Scan (ClamAV)</strong></span>
-                            </label>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Engine</label>
-                                <select name="vs_type" class="form-input">
-                                    <option value="api" {% if cfg.get('virus_scan', {}).get('type') == 'api' %}selected{% endif %}>Rspamd API</option>
-                                    <option value="clamav" {% if cfg.get('virus_scan', {}).get('type', 'clamav') == 'clamav' %}selected{% endif %}>ClamAV Daemon</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>Socket Path</label>
-                                <input type="text" name="vs_socket" value="{{ cfg.get('virus_scan', {}).get('socket', '/var/run/clamav/clamd.ctl') }}" class="form-input" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <hr class="divider" />
-
-                    <!-- URL Blacklist -->
-                    <div class="security-card">
-                        <div class="form-group form-check-group">
-                            <label class="toggle-label">
-                                <input type="checkbox" name="url_bl_enable" value="on" {% if cfg.get('url_blacklist', {}).get('enable') %}checked{% endif %} class="toggle-input" />
-                                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                                <span><strong>URL Blacklist (DNSBL)</strong></span>
-                            </label>
-                        </div>
-                        <div class="form-group">
-                            <label>Custom Blocked Domains <small>(one per line)</small></label>
-                            <textarea name="url_bl_domains" rows="3" class="form-textarea" placeholder="bad-payload.com">{{ cfg.get('url_blacklist', {}).get('custom_domains', []) | join('\n') }}</textarea>
-                        </div>
-                    </div>
-
-                    <hr class="divider" />
-
-                    <!-- DKIM Policy -->
-                    <div class="security-card">
-                        <div class="form-group form-check-group">
-                            <label class="toggle-label">
-                                <input type="checkbox" name="dkim_enable" value="on" {% if cfg.get('dkim_policy', {}).get('enable') %}checked{% endif %} class="toggle-input" />
-                                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                                <span><strong>DKIM Policy Enforcement</strong></span>
-                            </label>
-                        </div>
-                        <div style="display: flex; gap: 20px;">
-                            <label class="toggle-label small">
-                                <input type="checkbox" name="dkim_verify" value="on" {% if cfg.get('dkim_policy', {}).get('verification', True) %}checked{% endif %} class="toggle-input" />
-                                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                                <span>Verify Inbound</span>
-                            </label>
-                            <label class="toggle-label small">
-                                <input type="checkbox" name="dkim_sign" value="on" {% if cfg.get('dkim_policy', {}).get('signing') %}checked{% endif %} class="toggle-input" />
-                                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                                <span>Sign Outbound</span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <hr class="divider" />
-
-                    <!-- Fuzzy Hash -->
-                    <div class="security-card">
-                        <div class="form-group form-check-group">
-                            <label class="toggle-label">
-                                <input type="checkbox" name="fz_enable" value="on" {% if cfg.get('fuzzy_hash', {}).get('enable') %}checked{% endif %} class="toggle-input" />
-                                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                                <span><strong>Fuzzy Hash Check</strong></span>
-                            </label>
-                        </div>
-                        <div class="form-group">
-                            <label>Match Threshold Score</label>
-                            <input type="number" name="fz_threshold" step="0.1" value="{{ cfg.get('fuzzy_hash', {}).get('threshold', 10.0) }}" class="form-input" />
-                        </div>
-                    </div>
-                </div>
-
-                <div class="tab-content" id="tab-lists" style="display: none;">
-                    <div class="form-group">
-                        <label data-i18n="lbl_whitelist_ip">Whitelist IPs (Internal/Trust)</label>
-                        <textarea name="whitelist_ips" rows="5" class="form-textarea" placeholder="192.168.1.100">{{ cfg.get('whitelist_ips', []) | join('\n') }}</textarea>
-                    </div>
-                    <div class="form-group">
-                        <label data-i18n="lbl_blacklist_dm">Global Blacklist Domains</label>
-                        <textarea name="blacklist_domains" rows="5" class="form-textarea" placeholder="spammer.com">{{ cfg.get('blacklist_domains', []) | join('\n') }}</textarea>
-                    </div>
-                </div>
-
-                <div class="tab-content" id="tab-lua" style="display: none;">
-                    <div class="form-group">
-                        <label>Custom Rspamd Lua Rules</label>
-                        <textarea name="custom_lua" rows="12" class="form-textarea mono" style="font-size: 0.85rem; background: #1e1e1e; color: #d4d4d4; padding: 15px;" placeholder="-- Custom lua code here
-rspamd_config:register_symbol({
-  name = 'MY_RULE',
-  callback = function(task)
-    return true
-  end,
-  score = 1.0
-})">{{ cfg.get('custom_lua', '') }}</textarea>
-                        <small class="muted">Warning: Invalid Lua syntax may prevent Rspamd from starting. Validation is performed on save.</small>
                     </div>
                 </div>
             </div>
 
-            <div class="form-actions" style="margin-top: 30px;">
-                <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">🚀 Apply Production Config</button>
+            <!-- 3. Rate Limiting -->
+            <div class="ops-section">
+                <div class="ops-section-header">
+                    <h3 class="ops-section-title" data-i18n="ttl_rate_limits">Rate Limiting</h3>
+                </div>
+                <div class="form-group">
+                    <label class="toggle-label">
+                        <input type="checkbox" name="rl_enable" value="on" {% if cfg.get('rate_limit', {}).get('enable', True) %}checked{% endif %} class="toggle-input" />
+                        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                        <span data-i18n="lbl_rate_limit_en"><strong>Enable Rspamd Rate Limiting</strong></span>
+                    </label>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-i18n="lbl_burst">Burst (Max connections)</label>
+                        <input type="number" name="rl_burst" min="1" value="{{ cfg.get('rate_limit', {}).get('burst', 100) }}" class="form-input" />
+                    </div>
+                    <div class="form-group">
+                        <label data-i18n="lbl_rate">Rate Frequency</label>
+                        <input type="text" name="rl_rate" value="{{ cfg.get('rate_limit', {}).get('rate', '50 / 1min') }}" class="form-input" />
+                    </div>
+                </div>
             </div>
+
+            <!-- 4. Virus Scan (ClamAV) -->
+            <div class="ops-section">
+                <div class="ops-section-header">
+                    <h3 class="ops-section-title" data-i18n="ttl_clamav">Virus Scanning (ClamAV)</h3>
+                </div>
+                <div class="form-group">
+                    <label class="toggle-label">
+                        <input type="checkbox" name="vs_enable" value="on" {% if cfg.get('virus_scan', {}).get('enable') %}checked{% endif %} class="toggle-input" />
+                        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                        <span data-i18n="lbl_clamav_enable"><strong data-i18n="lbl_clamav_enable">Enable Real-time Virus Scanning</strong></span>
+                    </label>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-i18n="lbl_engine_type">Scan Engine</label>
+                        <select name="vs_type" class="form-select">
+                            <option value="api" {% if cfg.get('virus_scan', {}).get('type') == 'api' %}selected{% endif %}>Rspamd API</option>
+                            <option value="clamav" {% if cfg.get('virus_scan', {}).get('type', 'clamav') == 'clamav' %}selected{% endif %}>ClamAV Daemon</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label data-i18n="lbl_socket_path">Socket Path</label>
+                        <input type="text" name="vs_socket" value="{{ cfg.get('virus_scan', {}).get('socket', '/var/run/clamav/clamd.ctl') }}" class="form-input" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. URL Blacklist & Security Updates -->
+            <div class="ops-section">
+                <div class="ops-section-header">
+                    <h3 class="ops-section-title" data-i18n="ttl_url_bl">URL & DNS Blacklisting</h3>
+                </div>
+                <div class="form-group">
+                    <label class="toggle-label">
+                        <input type="checkbox" name="url_bl_enable" value="on" {% if cfg.get('url_blacklist', {}).get('enable') %}checked{% endif %} class="toggle-input" />
+                        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                        <span data-i18n="lbl_dnsbl_mon"><strong>Enable DNSBL Monitoring</strong></span>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label data-i18n="lbl_custom_block_dom">Custom Blocked Domains (one per line)</label>
+                    <textarea name="url_bl_domains" rows="3" class="form-textarea" placeholder="bad-payload.com" data-i18n="ph_bad_payload">{{ cfg.get('url_blacklist', {}).get('custom_domains', []) | join('\n') }}</textarea>
+                </div>
+            </div>
+
+            <!-- 6. DKIM Policy -->
+            <div class="ops-section">
+                <div class="ops-section-header">
+                    <h3 class="ops-section-title" data-i18n="ttl_dkim_enforce">DKIM Enforcement</h3>
+                </div>
+                <div class="form-group">
+                    <label class="toggle-label">
+                        <input type="checkbox" name="dkim_enable" value="on" {% if cfg.get('dkim_policy', {}).get('enable') %}checked{% endif %} class="toggle-input" />
+                        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                        <span data-i18n="lbl_dkim_mgmt"><strong>Enable DKIM Management</strong></span>
+                    </label>
+                </div>
+                <div style="display: flex; gap: 2rem;">
+                    <label class="toggle-label">
+                        <input type="checkbox" name="dkim_verify" value="on" {% if cfg.get('dkim_policy', {}).get('verification', True) %}checked{% endif %} class="toggle-input" />
+                        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                        <span data-i18n="lbl_dkim_verify">Verify Inbound</span>
+                    </label>
+                    <label class="toggle-label">
+                        <input type="checkbox" name="dkim_sign" value="on" {% if cfg.get('dkim_policy', {}).get('signing') %}checked{% endif %} class="toggle-input" />
+                        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                        <span data-i18n="lbl_dkim_sign">Sign Outbound</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 7. Fuzzy Hashing -->
+            <div class="ops-section">
+                <div class="ops-section-header">
+                    <h3 class="ops-section-title" data-i18n="ttl_fuzzy_hash">Fuzzy Content Hashing</h3>
+                </div>
+                <div class="form-group">
+                    <label class="toggle-label">
+                        <input type="checkbox" name="fz_enable" value="on" {% if cfg.get('fuzzy_hash', {}).get('enable') %}checked{% endif %} class="toggle-input" />
+                        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                        <span data-i18n="lbl_fuzzy_detect"><strong>Enable Fuzzy Pattern Detection</strong></span>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label data-i18n="lbl_match_thresh">Match Threshold Score</label>
+                    <input type="number" name="fz_threshold" step="0.1" value="{{ cfg.get('fuzzy_hash', {}).get('threshold', 10.0) }}" class="form-input" style="width: 150px;" />
+                </div>
+            </div>
+
+            <!-- 8. IP & Domain Lists -->
+            <div class="ops-section">
+                <div class="ops-section-header">
+                    <h3 class="ops-section-title" data-i18n="ttl_global_access">Global Access Lists</h3>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-i18n="lbl_whitelist_ips">Whitelist IPs (Internal/Trust)</label>
+                        <textarea name="whitelist_ips" rows="6" class="form-textarea">{{ cfg.get('whitelist_ips', []) | join('\n') }}</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label data-i18n="lbl_blacklist_doms">Blacklist Domains</label>
+                        <textarea name="blacklist_domains" rows="6" class="form-textarea">{{ cfg.get('blacklist_domains', []) | join('\n') }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 9. Custom Lua Rules -->
+            <div class="ops-section">
+                <div class="ops-section-header">
+                    <h3 class="ops-section-title" data-i18n="ttl_lua_rules">Custom Lua Rules</h3>
+                </div>
+                <div class="form-group">
+                    <textarea name="custom_lua" rows="10" class="form-textarea mono" style="font-size: 0.8rem; background: #020617;" placeholder="-- Custom lua rule logic" data-i18n="[placeholder]val_lua_ph">{{ cfg.get('custom_lua', '') }}</textarea>
+                    <small class="text-muted" data-i18n="txt_lua_d">Direct injection into Rspamd local configuration. Invalid syntax will block service reload.</small>
+                </div>
+            </div>
+
         </div>
 
-        <!-- ── Right Column: Status ────────────────────────────────────────── -->
-        <div>
-            <div class="card stat-card-lg">
-                <div class="stat-label" data-i18n="ttl_rsp_service">Rspamd Service Status</div>
-                <div class="stat-value">
-                    <span class="badge badge-{% if status == 'running' %}green{% else %}red{% endif %} badge-lg" style="font-size: 1.2rem; padding: 10px 20px;">
+        <!-- Right Column: Operational Status & Summary -->
+        <div style="display: flex; flex-direction: column; gap: 1.5rem; position: sticky; top: calc(var(--nav-h) + 2rem);">
+            
+            <div class="ops-card" style="border-top: 4px solid var(--accent);">
+                <div class="ops-card-header">
+                    <h3 class="ops-card-title" data-i18n="ttl_service_status">Service Status</h3>
+                </div>
+                <div class="ops-card-body" style="padding: 1.5rem; text-align: center;">
+                    <div class="ops-badge {% if status == 'running' %}ops-badge-sent{% else %}ops-badge-bounced{% endif %}" style="font-size: 1.2rem; padding: 0.5rem 1rem;" data-i18n="status_{{ status.lower() }}">
                         {{ status | upper }}
-                    </span>
+                    </div>
+                    <p class="text-muted mt-1"><span data-i18n="lbl_worker_type">Worker</span>: <span data-i18n="status_{{ cfg.get('worker_type', 'normal').lower() }}">{{ cfg.get('worker_type', 'normal') | upper }}</span></p>
                 </div>
             </div>
 
-            <div class="card mt-2">
-                <h3 class="card-title">Policy Summary</h3>
-                <div class="info-list">
-                    <div class="info-row">
-                        <span>Antivirus</span>
-                        <span class="badge badge-{% if cfg.get('virus_scan', {}).get('enable') %}green{% else %}red{% endif %}">
-                            {{ 'ACTIVE' if cfg.get('virus_scan', {}).get('enable') else 'OFF' }}
-                        </span>
-                    </div>
-                    <div class="info-row">
-                        <span>URL Filter</span>
-                        <span class="badge badge-{% if cfg.get('url_blacklist', {}).get('enable') %}green{% else %}red{% endif %}">
-                            {{ 'ACTIVE' if cfg.get('url_blacklist', {}).get('enable') else 'OFF' }}
-                        </span>
-                    </div>
-                    <div class="info-row">
-                        <span>DKIM Auth</span>
-                        <span class="badge badge-{% if cfg.get('dkim_policy', {}).get('enable') %}green{% else %}red{% endif %}">
-                            {{ 'ACTIVE' if cfg.get('dkim_policy', {}).get('enable') else 'OFF' }}
-                        </span>
-                    </div>
-                    <div class="info-row">
-                        <span>Fuzzy Match</span>
-                        <span class="badge badge-{% if cfg.get('fuzzy_hash', {}).get('enable') %}green{% else %}red{% endif %}">
-                            {{ 'ACTIVE' if cfg.get('fuzzy_hash', {}).get('enable') else 'OFF' }}
-                        </span>
-                    </div>
+            <div class="ops-card">
+                <div class="ops-card-header">
+                    <h3 class="ops-card-title" data-i18n="ttl_active_policies">Active Policies</h3>
+                </div>
+                <div class="ops-card-body" style="padding: 1rem;">
+                    <ul style="list-style: none; display: flex; flex-direction: column; gap: 0.75rem;">
+                        <li style="display: flex; justify-content: space-between;">
+                            <span data-i18n="lbl_antivirus">Antivirus</span>
+                            <span class="text-{% if cfg.get('virus_scan', {}).get('enable') %}success{% else %}danger{% endif %}">●</span>
+                        </li>
+                        <li style="display: flex; justify-content: space-between;">
+                            <span data-i18n="lbl_rate_limits">Rate Limit</span>
+                            <span class="text-{% if cfg.get('rate_limit', {}).get('enable', True) %}success{% else %}danger{% endif %}">●</span>
+                        </li>
+                        <li style="display: flex; justify-content: space-between;">
+                            <span data-i18n="lbl_greylist">Greylisting</span>
+                            <span class="text-{% if cfg.get('greylist', True) %}success{% else %}danger{% endif %}">●</span>
+                        </li>
+                        <li style="display: flex; justify-content: space-between;">
+                            <span data-i18n="lbl_dkim_policy">DKIM Policy</span>
+                            <span class="text-{% if cfg.get('dkim_policy', {}).get('enable') %}success{% else %}danger{% endif %}">●</span>
+                        </li>
+                        <li style="display: flex; justify-content: space-between;">
+                            <span data-i18n="lbl_fuzzy_match">Fuzzy Match</span>
+                            <span class="text-{% if cfg.get('fuzzy_hash', {}).get('enable') %}success{% else %}danger{% endif %}">●</span>
+                        </li>
+                    </ul>
                 </div>
             </div>
-            
-            <div class="card mt-2" style="background: rgba(46, 204, 113, 0.1); border: 1px solid #2ecc71;">
-                <h3 class="card-title" style="color: #27ae60;">Production Safety</h3>
-                <p class="small muted">Changes are verified with <code>rspamadm configtest</code> before being applied. A backup is created in <code>runtime/backups/</code>.</p>
+
+            <div class="form-actions" style="margin-top: 1rem;">
+                <button type="submit" class="btn btn-primary btn-full btn-lg" style="height: 54px; font-size: 1rem;" data-i18n="btn_apply_prod">🚀 Apply Production Config</button>
             </div>
+            <p class="text-muted" style="text-align: center; font-size: 0.8rem;" data-i18n="txt_configtest">Changes are verified via <code>configtest</code></p>
         </div>
 
     </div>
 </form>
-
-<style>
-    .tabs-header { display: flex; border-bottom: 2px solid #eee; margin-bottom: 20px; gap: 5px; }
-    .tab-btn { border: none; background: none; padding: 10px 20px; cursor: pointer; font-weight: bold; color: #7f8c8d; border-bottom: 3px solid transparent; transition: 0.2s; }
-    .tab-btn:hover { background: #f9f9f9; }
-    .tab-btn.active { color: #3498db; border-bottom-color: #3498db; }
-    .tab-content { animation: fadeIn 0.3s ease; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-    .security-card { padding: 10px 0; }
-    .divider { border: 0; border-top: 1px solid #eee; margin: 20px 0; }
-    .toggle-label.small { font-size: 0.9rem; }
-</style>
-
-<script>
-    function openTab(evt, tabId) {
-        var i, tabContent, tabBtns;
-        tabContent = document.getElementsByClassName("tab-content");
-        for (i = 0; i < tabContent.length; i++) {
-            tabContent[i].style.display = "none";
-        }
-        tabBtns = document.getElementsByClassName("tab-btn");
-        for (i = 0; i < tabBtns.length; i++) {
-            tabBtns[i].className = tabBtns[i].className.replace(" active", "");
-        }
-        document.getElementById(tabId).style.display = "block";
-        evt.currentTarget.className += " active";
-    }
-</script>
-
 {% endblock %}

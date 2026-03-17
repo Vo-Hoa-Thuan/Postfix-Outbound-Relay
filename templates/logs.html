@@ -1,121 +1,124 @@
 {% extends "base.html" %}
 {% set active_page = "logs" %}
 
-{% block title %}SMTP Monitor – Postfix Relay Panel{% endblock %}
-{% block page_title %}SMTP Monitor{% endblock %}
+{% block title %}SMTP Monitor – Operations Console{% endblock %}
 
 {% block content %}
+<div class="section-header" style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: flex-end;">
+    <div>
+        <h2 style="color: var(--accent); font-size: 1.1rem; letter-spacing: 0.1em; text-transform: uppercase;" data-i18n="ttl_smtp_monitor">🖥️ SMTP Monitoring System</h2>
+        <div class="text-muted" style="font-size: 0.85rem; margin-top: 0.25rem;">{{ total }} <span data-i18n="txt_operations_logged">operations logged</span> · <span data-i18n="txt_page">Page</span> {{ page }} <span data-i18n="txt_of">of</span> {{ total_pages }}</div>
+    </div>
+    <div style="display: flex; gap: 0.5rem;">
+        <a href="/logs" class="btn btn-secondary btn-xs" data-i18n="btn_refresh_feed">⟳ Refresh Feed</a>
+    </div>
+</div>
 
-<!-- ── Filter Bar ────────────────────────────────────────────────────── -->
-<div class="card filter-card">
-    <form method="get" action="/logs" class="filter-form">
-        <div class="filter-group">
-            <label data-i18n="lbl_local_ip">Local IP</label>
-            <select name="ip" class="form-input form-select">
-                <option value="" data-i18n="lbl_all_ips">All IPs</option>
-                {% for aip in all_ips %}
-                <option value="{{ aip }}" {% if f_ip==aip %}selected{% endif %}>{{ aip }}</option>
+<!-- Filter Panel -->
+<div class="ops-card" style="margin-bottom: 2rem;">
+    <div class="ops-card-header">
+        <h3 class="ops-card-title" data-i18n="ttl_search_filter_archive">Search & Filter Archive</h3>
+    </div>
+    <div class="ops-card-body">
+        <form method="get" action="/logs" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.25rem; align-items: flex-end;">
+            <div class="form-group" style="margin-bottom: 0;">
+                <label data-i18n="lbl_relay_ip">Relay IP</label>
+                <select name="ip" class="form-select">
+                    <option value="" data-i18n="opt_all_infrastructure">All Infrastructure</option>
+                    {% for aip in all_ips %}
+                    <option value="{{ aip }}" {% if f_ip == aip %}selected{% endif %}>{{ aip }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label data-i18n="lbl_sender_envelope_from">Sender / Envelope From</label>
+                <input type="text" name="sender" value="{{ f_sender }}" placeholder="e.g. @gmail.com" class="form-input" data-i18n="ph_sender_eg" />
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label data-i18n="lbl_recipient_to">Recipient / To</label>
+                <input type="text" name="recipient" value="{{ f_recipient }}" placeholder="e.g. user@domain.com" class="form-input" data-i18n="ph_recipient_eg" />
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label data-i18n="lbl_status_filter">Status</label>
+                <select name="status" class="form-select">
+                    <option value="" data-i18n="opt_all_statuses">All Statuses</option>
+                    <option value="sent" {% if f_status == 'sent' %}selected{% endif %} data-i18n="status_sent">SENT</option>
+                    <option value="deferred" {% if f_status == 'deferred' %}selected{% endif %} data-i18n="status_deferred">DEFERRED</option>
+                    <option value="bounced" {% if f_status == 'bounced' %}selected{% endif %} data-i18n="status_bounced">BOUNCED</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+                <button type="submit" class="btn btn-primary" style="flex: 1;" data-i18n="btn_search">Search</button>
+                <a href="/logs" class="btn btn-secondary" title="Clear Filters" data-i18n="btn_clear_filters">✕</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Results Table -->
+<div class="ops-card">
+    <div class="ops-card-body" style="padding: 0;">
+        {% if entries %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 180px;" data-i18n="col_timestamp">Timestamp</th>
+                    <th data-i18n="col_envelope_from">Envelope From</th>
+                    <th data-i18n="col_recipient">Recipient</th>
+                    <th data-i18n="col_subject_id">Subject / ID</th>
+                    <th data-i18n="col_peer_dest">Peer / Dest</th>
+                    <th data-i18n="col_relay_ip">Relay IP</th>
+                    <th style="text-align: center;" data-i18n="col_result">Result</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in entries %}
+                <tr class="log-row">
+                    <td class="mono" style="font-size: 0.75rem; color: var(--text-secondary);">{{ e.time }}</td>
+                    <td class="mono text-accent" style="max-width: 250px; overflow: hidden; text-overflow: ellipsis;">{{ e.from }}</td>
+                    <td class="mono" style="max-width: 250px; overflow: hidden; text-overflow: ellipsis;">{{ e.to }}</td>
+                    <td class="text-muted" style="font-size: 0.8rem;">{{ e.subject or "—" }}</td>
+                    <td class="mono" style="font-size: 0.8rem;">{{ e.dest_ip }}</td>
+                    <td class="mono" style="font-size: 0.8rem; font-weight: 600;">{{ e.local_ip or "—" }}</td>
+                    <td style="text-align: center;">
+                        <span class="badge badge-{% if e.status == 'sent' %}green{% elif e.status == 'deferred' %}yellow{% else %}red{% endif %}" style="min-width: 80px;" data-i18n="status_{{ e.status.lower() }}">
+                            {{ e.status | upper }}
+                        </span>
+                    </td>
+                </tr>
                 {% endfor %}
-            </select>
-        </div>
-        <div class="filter-group">
-            <label data-i18n="lbl_sender">Sender</label>
-            <input type="text" name="sender" value="{{ f_sender }}" placeholder="from@example.com" class="form-input" />
-        </div>
-        <div class="filter-group">
-            <label data-i18n="lbl_recipient">Recipient</label>
-            <input type="text" name="recipient" value="{{ f_recipient }}" placeholder="to@domain.com"
-                class="form-input" />
-        </div>
-        <div class="filter-group">
-            <label data-i18n="lbl_date">Date</label>
-            <input type="date" name="date" value="{{ f_date }}" class="form-input" />
-        </div>
-        <div class="filter-group">
-            <label data-i18n="lbl_status">Status</label>
-            <select name="status" class="form-input form-select">
-                <option value="" data-i18n="lbl_all">All</option>
-                <option value="sent" {% if f_status=='sent' %}selected{% endif %}>Sent</option>
-                <option value="deferred" {% if f_status=='deferred' %}selected{% endif %}>Deferred</option>
-                <option value="bounced" {% if f_status=='bounced' %}selected{% endif %}>Bounced</option>
-            </select>
-        </div>
-        <div class="filter-actions">
-            <button type="submit" class="btn btn-primary" data-i18n="btn_filter">Filter</button>
-            <a href="/logs" class="btn btn-secondary" data-i18n="btn_reset">Reset</a>
-        </div>
-    </form>
-</div>
+            </tbody>
+        </table>
 
-<!-- ── Results header ────────────────────────────────────────────────── -->
-<div class="section-header">
-    <h2 data-i18n="ttl_mail_log">Mail Log</h2>
-    <span class="muted">{{ total }} entries · Page {{ page }} / {{ total_pages }}</span>
-</div>
+        <!-- Pagination -->
+        {% if total_pages > 1 %}
+        <div style="padding: 1.5rem; display: flex; justify-content: center; align-items: center; gap: 2rem; border-top: 1px solid var(--border-light);">
+            {% if page > 1 %}
+            <a href="/logs?ip={{ f_ip }}&sender={{ f_sender }}&recipient={{ f_recipient }}&date={{ f_date }}&status={{ f_status }}&page={{ page - 1 }}" class="btn btn-secondary btn-xs" data-i18n="btn_prev_page">← Previous Page</a>
+            {% else %}
+            <button class="btn btn-secondary btn-xs" disabled style="opacity: 0.3;" data-i18n="btn_prev_page">← Previous Page</button>
+            {% endif %}
 
-<!-- ── Log Table ─────────────────────────────────────────────────────── -->
-{% if entries %}
-<div class="card table-card">
-    <table class="data-table log-table">
-        <thead>
-            <tr>
-                <th data-i18n="col_time">Time</th>
-                <th data-i18n="col_from">From</th>
-                <th data-i18n="col_to">To</th>
-                <th data-i18n="col_subject">Subject</th>
-                <th data-i18n="col_dest_ip">Dest IP</th>
-                <th data-i18n="col_local_ip">Local IP</th>
-                <th data-i18n="lbl_status">Status</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for e in entries %}
-            <tr class="log-row log-{{ e.status }}">
-                <td class="mono nowrap">{{ e.time }}</td>
-                <td class="mono">{{ e.from }}</td>
-                <td class="mono">{{ e.to }}</td>
-                <td class="ellipsis" title="{{ e.subject }}">{{ e.subject or "—" }}</td>
-                <td class="mono">{{ e.dest_ip }}</td>
-                <td class="mono">{{ e.local_ip or "—" }}</td>
-                <td>
-                    <span
-                        class="badge badge-{% if e.status == 'sent' %}green{% elif e.status == 'deferred' %}yellow{% else %}red{% endif %}">
-                        {{ e.status | upper }}
-                    </span>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
+            <div style="font-weight: 600; font-size: 0.9rem; color: var(--text-secondary);">
+                {{ page }} <span style="font-weight: 400; color: var(--text-muted); margin: 0 0.5rem;">/</span> {{ total_pages }}
+            </div>
 
-<!-- ── Pagination ─────────────────────────────────────────────────────── -->
-{% if total_pages > 1 %}
-<div class="pagination">
-    {% if page > 1 %}
-    <a class="btn btn-xs btn-secondary"
-        href="/logs?ip={{ f_ip }}&sender={{ f_sender }}&recipient={{ f_recipient }}&date={{ f_date }}&status={{ f_status }}&page={{ page - 1 }}">
-        ← Prev
-    </a>
-    {% endif %}
-
-    <span class="page-info">Page {{ page }} of {{ total_pages }}</span>
-
-    {% if page < total_pages %} <a class="btn btn-xs btn-secondary"
-        href="/logs?ip={{ f_ip }}&sender={{ f_sender }}&recipient={{ f_recipient }}&date={{ f_date }}&status={{ f_status }}&page={{ page + 1 }}">
-        Next →
-        </a>
+            {% if page < total_pages %}
+            <a href="/logs?ip={{ f_ip }}&sender={{ f_sender }}&recipient={{ f_recipient }}&date={{ f_date }}&status={{ f_status }}&page={{ page + 1 }}" class="btn btn-secondary btn-xs" data-i18n="btn_next_page">Next Page →</a>
+            {% else %}
+            <button class="btn btn-secondary btn-xs" disabled style="opacity: 0.3;" data-i18n="btn_next_page">Next Page →</button>
+            {% endif %}
+        </div>
         {% endif %}
-</div>
-{% endif %}
 
-{% else %}
-<div class="empty-state">
-    <p data-i18n="lbl_no_logs">No log entries match your filters.</p>
-    {% if f_ip or f_sender or f_recipient or f_date or f_status %}
-    <a href="/logs" class="btn btn-secondary mt-1" data-i18n="btn_clear_filter">Clear Filters</a>
-    {% endif %}
+        {% else %}
+        <div style="padding: 5rem; text-align: center;">
+            <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.2;">🔍</div>
+            <h3 style="color: var(--text-secondary);" data-i18n="txt_no_logs">No Matching Logs Found</h3>
+            <p class="text-muted" style="margin-top: 0.5rem;" data-i18n="txt_adjust_search">Try adjusting your search filters or temporal range.</p>
+            <a href="/logs" class="btn btn-secondary" style="margin-top: 1.5rem;" data-i18n="btn_clear_filters">Clear All Filters</a>
+        </div>
+        {% endif %}
+    </div>
 </div>
-{% endif %}
-
 {% endblock %}

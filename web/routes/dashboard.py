@@ -1,8 +1,10 @@
 """
-web/routes/dashboard.py – Dashboard overview route.
+web/routes/dashboard.py – Optimized Dashboard overview route.
 """
 
 import os
+import json
+import time
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -12,28 +14,67 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 router = APIRouter()
 
+def _read_recent_logs(limit=20):
+    """Fast tail-read of the parsed.log file without reading the whole file."""
+    parsed_log = os.path.join(BASE_DIR, "logs", "parsed.log")
+    if not os.path.exists(parsed_log): return []
+    try:
+        with open(parsed_log, "rb") as f:
+            f.seek(0, os.SEEK_END)
+            size = f.tell()
+            # Seek back 64KB - plenty for dozens of JSON lines
+            offset = max(0, size - 65536)
+            f.seek(offset)
+            raw = f.read().decode("utf-8", errors="replace")
+            lines = raw.splitlines()
+            
+            results = []
+            # Iterate backwards to get latest first
+            for line in reversed(lines):
+                line = line.strip()
+                if not line: continue
+                try:
+                    results.append(json.loads(line))
+                    if len(results) >= limit: break
+                except: continue
+            return results
+    except Exception as e:
+        print(f"[Dashboard] Log tail error: {e}")
+        return []
+
+def _count_deferred_this_hour() -> int:
+    """Estimated count using recent logs for performance."""
+    from datetime import datetime
+    now_hour = datetime.now().strftime("%Y-%m-%d %H:")
+    count = 0
+    # Read last 300 lines to estimate hour count (much faster than full scan)
+    logs = _read_recent_logs(300)
+    for entry in logs:
+        if entry.get("status") == "deferred" and entry.get("time", "").startswith(now_hour):
+            count += 1
+    return count
 
 @router.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
     from core.postfix   import get_status as postfix_status
     from core.rspamd    import get_status as rspamd_status
     from core.relay     import get_active_ip, get_total_sent_this_hour, get_all_counters
-    from core.rotation  import get_time_remaining, get_rotation_config
+    from core.rotation  import get_time_remaining
     from core.fileio    import read_json
-
+    
     active_ip_cfg  = get_active_ip()
     active_ip      = active_ip_cfg["ip"] if active_ip_cfg else "—"
-    rotation_cfg   = get_rotation_config()
     time_remaining = get_time_remaining()
-    counters       = get_all_counters()
-
-    # Count deferred (from parsed log, last 100 entries)
-    deferred = _count_deferred_this_hour()
     
-    # Get blacklisted IPs (disabled with 'BLACKLISTED' in note)
+    # Lightweight stats
+    counters       = get_all_counters()
+    deferred       = _count_deferred_this_hour()
+    total_sent     = get_total_sent_this_hour()
+    
+    # Blacklist Alerts
     RELAY_IPS_FILE = os.path.join(BASE_DIR, "config", "relay_ips.json")
     all_ips = read_json(RELAY_IPS_FILE, {"ips": []}).get("ips", [])
-    blacklisted_ips = [ip for ip in all_ips if not ip.get("enabled", True) and "BLACKLISTED" in ip.get("note", "")]
+    blacklisted_ips = [ip for ip in all_ips if ip.get("blacklist_status") == "BLACKLISTED"]
 
     return templates.TemplateResponse("dashboard.html", {
         "request":         request,
@@ -41,129 +82,44 @@ async def dashboard(request: Request):
         "rspamd_status":   rspamd_status(),
         "active_ip":       active_ip,
         "active_ip_cfg":   active_ip_cfg,
-        "rotation_mode":   rotation_cfg.get("mode", "weighted"),
-        "rotation_secs":   rotation_cfg.get("rotation_seconds", 60),
         "time_remaining":  time_remaining,
-        "total_sent":      get_total_sent_this_hour(),
+        "total_sent":      total_sent,
         "total_deferred":  deferred,
         "counters":        counters,
         "blacklisted_ips": blacklisted_ips,
+        "recent_logs":     _read_recent_logs(15),
     })
 
+@router.get("/api/logs")
+async def api_logs():
+    return _read_recent_logs(15)
 
 @router.get("/api/status")
 async def api_status():
     from core.postfix   import get_status as postfix_status
     from core.rspamd    import get_status as rspamd_status
-    from core.relay     import get_active_ip, get_total_sent_this_hour, get_all_counters
-    from core.rotation  import get_time_remaining, get_rotation_config
+    from core.relay     import get_active_ip, get_total_sent_this_hour
+    from core.rotation  import get_time_remaining
     from core.fileio    import read_json
 
-    active_ip_cfg  = get_active_ip()
-    active_ip      = active_ip_cfg["ip"] if active_ip_cfg else "—"
-    rotation_cfg   = get_rotation_config()
-    time_remaining = get_time_remaining()
+    active_ip_cfg = get_active_ip()
+    config = read_json(os.path.join(BASE_DIR, "config", "relay_ips.json"), {"ips": []})
+    blacklisted = [ip for ip in config.get("ips", []) if ip.get("blacklist_status") == "BLACKLISTED"]
     
-    # We omit counters here to keep it simple, or return them if table reloading is wanted.
-    # For now, just general stats
     return {
         "postfix_status":  postfix_status(),
         "rspamd_status":   rspamd_status(),
-        "active_ip":       active_ip,
-        "active_ip_cfg":   active_ip_cfg,
-        "rotation_mode":   rotation_cfg.get("mode", "weighted"),
-        "rotation_secs":   rotation_cfg.get("rotation_seconds", 60),
-        "time_remaining":  time_remaining,
+        "active_ip":       active_ip_cfg["ip"] if active_ip_cfg else "—",
+        "time_remaining":  get_time_remaining(),
         "total_sent":      get_total_sent_this_hour(),
         "total_deferred":  _count_deferred_this_hour(),
-        "blacklisted_count": len([ip for ip in read_json(os.path.join(BASE_DIR, "config", "relay_ips.json"), {"ips": []}).get("ips", []) if not ip.get("enabled", True) and "BLACKLISTED" in ip.get("note", "")])
+        "blacklisted_count": len(blacklisted)
     }
-
-
-def _count_deferred_this_hour() -> int:
-    import json, time
-    from datetime import datetime
-    parsed_log = os.path.join(BASE_DIR, "logs", "parsed.log")
-    if not os.path.exists(parsed_log):
-        return 0
-    now_hour = datetime.now().strftime("%Y-%m-%d %H:")
-    count = 0
-    try:
-        with open(parsed_log, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                    if entry.get("status") == "deferred" and entry.get("time", "").startswith(now_hour):
-                        count += 1
-                except Exception:
-                    pass
-    except Exception:
-        pass
-    return count
 
 @router.get("/api/chart")
 async def api_chart():
-    import json
-    from datetime import datetime, timedelta
-    
-    parsed_log = os.path.join(BASE_DIR, "logs", "parsed.log")
-    
-    # Initialize the last 24 hours with 0
-    now = datetime.now()
-    hours_labels = []
-    chart_data = {"sent": {}, "deferred": {}, "bounced": {}}
-    
-    # Create x-axis labels for the last 24 hours (including current hour)
-    for i in range(23, -1, -1):
-        h_time = now - timedelta(hours=i)
-        label = h_time.strftime("%H:00")
-        prefix = h_time.strftime("%Y-%m-%d %H") # Key for matching log time
-        hours_labels.append({"label": label, "prefix": prefix})
-        
-        chart_data["sent"][prefix] = 0
-        chart_data["deferred"][prefix] = 0
-        chart_data["bounced"][prefix] = 0
-        
-    oldest_prefix = hours_labels[0]["prefix"]
-    
-    if os.path.exists(parsed_log):
-        try:
-            with open(parsed_log, "r", encoding="utf-8") as f:
-                # To avoid reading massive files, we could read lines from bottom up, 
-                # but standard python reading top-down is fine for small/medium logs.
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        entry = json.loads(line)
-                        log_time = entry.get("time", "")
-                        status = entry.get("status", "")
-                        
-                        # Match the YYYY-MM-DD HH prefix
-                        if len(log_time) >= 13:
-                            prefix = log_time[:13]
-                            if prefix >= oldest_prefix and prefix in chart_data[status]:
-                                chart_data[status][prefix] += 1
-                                
-                    except Exception:
-                        pass
-        except Exception:
-            pass
-            
-    # Format into arrays matching the labels
-    sent_arr = [chart_data["sent"][h["prefix"]] for h in hours_labels]
-    deferred_arr = [chart_data["deferred"][h["prefix"]] for h in hours_labels]
-    bounced_arr = [chart_data["bounced"][h["prefix"]] for h in hours_labels]
-    
-    return {
-        "labels": [h["label"] for h in hours_labels],
-        "datasets": {
-            "sent": sent_arr,
-            "deferred": deferred_arr,
-            "bounced": bounced_arr
-        }
-    }
+    from core.fileio import read_json
+    cache_path = os.path.join(BASE_DIR, "runtime", "chart_cache.json")
+    if os.path.exists(cache_path):
+        return read_json(cache_path, {})
+    return {"labels": [], "datasets": {"sent": [], "deferred": [], "bounced": []}}

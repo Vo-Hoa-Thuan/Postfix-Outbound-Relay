@@ -6,6 +6,7 @@ and initialises default config/runtime files on first run.
 
 import os
 import sys
+import time
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -47,29 +48,44 @@ app.include_router(diagnostics_router)
 
 import asyncio
 
-async def _rotation_loop():
+async def _background_tasks():
     from core.rotation import rotate_if_needed
     from core.postfix import sync_transport
     from core.blacklist import auto_check_all
+    from logs.reader import parse_maillog, pre_aggregate_chart
     
-    print("[RelayPanel] Started background IP rotation and log monitor loop.")
+    print("[RelayPanel] Started background operations worker.")
+    
+    # Track last run times for different intervals
+    last_chart_agg = 0
+    last_log_parse = 0
+    
     while True:
         try:
-            # 1. IP Rotation
+            now = time.time()
+            
+            # 1. IP Rotation (Every check, has internal logic)
             rotated, new_ip = rotate_if_needed()
             if rotated and new_ip:
                 print(f"[RelayPanel] Auto-rotated to IP: {new_ip}")
                 sync_transport(new_ip)
                 
-            # 2. Periodic background checks
+            # 2. Blacklist Check (Has internal throttling/interval)
             auto_check_all()
 
-            # 3. Real-time Log Monitoring
-            from logs.reader import parse_maillog
-            parse_maillog(limit=1000)
+            # 3. Incremental Log Monitoring (Every 10 seconds)
+            if now - last_log_parse > 10:
+                parse_maillog(limit=500)
+                last_log_parse = now
+                
+            # 4. Chart Pre-Aggregation (Every 60 seconds)
+            if now - last_chart_agg > 60:
+                pre_aggregate_chart()
+                last_chart_agg = now
             
         except Exception as e:
-            print(f"[RelayPanel] Background loop error: {e}")
+            print(f"[RelayPanel] Background worker error: {e}")
+            
         await asyncio.sleep(5)
 
 
@@ -101,11 +117,13 @@ async def _init_defaults():
         open(parsed_log, "w").close()
 
     print("[RelayPanel] Startup complete - all config files verified.")
-    asyncio.create_task(_rotation_loop())
+    loop = asyncio.get_event_loop()
+    loop.create_task(_background_tasks())
 
 
 
 # ── Run directly ──────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+    # Python 3.6 might have issues with uvicorn reload in some versions
+    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=False)

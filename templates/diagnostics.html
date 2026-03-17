@@ -1,117 +1,141 @@
 {% extends "base.html" %}
 {% set active_page = "diagnostics" %}
 
-{% block title %}Diagnostics – Postfix Relay Panel{% endblock %}
-{% block page_title %}Diagnostic Tools{% endblock %}
+{% block title %}Diagnostics – Operations Console{% endblock %}
 
 {% block content %}
+<div class="section-header">
+    <h2 style="color: var(--accent); font-size: 1.1rem; letter-spacing: 0.1em; text-transform: uppercase;" data-i18n="ttl_diag_tools">🩺 System Diagnostics</h2>
+</div>
 
-<div class="layout-2col">
-
-    <!-- ── SMTP Test Tool ────────────────────────────────────────────── -->
-    <div class="card">
-        <h2 class="card-title">🚀 SMTP Test Tool</h2>
-        <p class="muted small mb-2">Send a real test email through the local Postfix relay (127.0.0.1:25) to verify IP rotation and Rspamd filtering.</p>
-        
-        {% if identity.mydomain == "local" or identity.myhostname == "localhost" %}
-        <div class="flash-error small" style="padding: 10px; margin-bottom: 15px;">
-            ⚠️ <b>Warning:</b> Postfix is still using default identity (localhost). 
-            External providers like Gmail will block your mail. 
-            Please set a real domain in <b>Settings</b>.
+<div class="dashboard-grid">
+    
+    <!-- Left Column: Test Tools -->
+    <div class="ops-card">
+        <div class="ops-card-header">
+            <h3 class="ops-card-title" data-i18n="ttl_smtp_test">SMTP Test Tool</h3>
         </div>
-        {% endif %}
+        <div class="ops-card-body">
+            <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 1.5rem;" data-i18n="txt_diag_d">Dispatch a test payload through the local Postfix relay (127.0.0.1:25) to verify IP rotation, SPF alignment, and Rspamd processing.</p>
+            
+            {% if identity and (identity.mydomain == "local" or identity.myhostname == "localhost") %}
+            <div style="background: var(--red-bg); border-left: 4px solid var(--red); padding: 1rem; border-radius: 4px; margin-bottom: 1.5rem;">
+                <div style="color: var(--red); font-weight: 700; font-size: 0.8rem; margin-bottom: 0.25rem;" data-i18n="alert_generic_id">⚠️ CRITICAL: GENERIC IDENTITY DETECTED</div>
+                <div style="font-size: 0.8rem; color: var(--text-primary);" data-i18n="txt_identity_warn">Postfix is configured with 'localhost/local'. Major providers (Gmail, Outlook) will likely reject this mail. Update core settings before testing.</div>
+            </div>
+            {% endif %}
 
-        <form action="/diagnostics/send-test" method="post" class="form-stack">
-            <div class="form-group">
-                <label>Recipient Email</label>
-                <input type="email" name="recipient" required placeholder="your-email@example.com" class="form-input" />
-            </div>
-            <div class="form-group">
-                <label>Sender Address (From)</label>
-                <input type="text" name="sender" value="test@{{ identity.mydomain }}" class="form-input" />
-                <span class="small muted">Make sure your domain has SPF records for IP: <b>45.122.223.116</b></span>
-            </div>
-            <div class="form-group">
-                <label>Subject</label>
-                <input type="text" name="subject" value="SMTP Relay Test Message" class="form-input" />
-            </div>
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary" style="width: 100%;">Send Test Email</button>
-            </div>
-        </form>
-
-        {% if request.query_params.get('msg_id') %}
-        <div id="trace-panel" class="mt-2" style="border-left: 4px solid var(--accent); padding-left: 15px;">
-            <h3 class="card-title" style="margin-bottom: 8px;">🔍 Real-Time Trace</h3>
-            <p class="small muted mb-1">Target Message-ID: <span id="trace-msg-id" class="mono">{{ request.query_params.get('msg_id') }}</span></p>
-            <div id="trace-results" class="terminal-box" style="max-height: 300px;">
-                <span class="muted">Polling logs...</span>
-            </div>
-            <button onclick="pollTrace()" class="btn btn-xs btn-secondary mt-1">Refresh Trace</button>
-        </div>
-        {% endif %}
-    </div>
-
-    <!-- ── Queue & Tracking ─────────────────────────────────────────── -->
-    <div>
-        <div class="card stat-card">
-            <div class="stat-label">Postfix Queue Summary</div>
-            <div class="stat-value" style="font-size: 1.2rem;">{{ queue.summary }}</div>
-            <form action="/diagnostics/queue/flush" method="post" class="mt-1">
-                <button type="submit" class="btn btn-xs btn-danger">Flush Queue</button>
+            <form action="/diagnostics/send-test" method="post" style="display: flex; flex-direction: column; gap: 1.25rem;">
+                <div class="form-group">
+                    <label data-i18n="lbl_target_recip">Target Recipient Address</label>
+                    <input type="email" name="recipient" placeholder="test@example.com" class="form-input" required data-i18n="[placeholder]ph_recipient_eg" />
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label data-i18n="lbl_env_from">Envelope Sender (From)</label>
+                        <input type="text" name="sender" value="test@{{ identity.mydomain if identity else 'local' }}" class="form-input" />
+                    </div>
+                    <div class="form-group">
+                        <label data-i18n="lbl_subject">Subject Header</label>
+                        <input type="text" name="subject" value="Operations Console: SMTP Diagnostic Payload" class="form-input" data-i18n="[value]val_diag_subject" />
+                    </div>
+                </div>
+                <div class="form-actions" style="margin-top: 1.5rem; border-top: 1px solid var(--border); padding-top: 1.5rem;">
+                    <button type="submit" class="btn btn-primary btn-lg" style="height: 52px;" data-i18n="btn_send_test">
+                    🚀 Send Test Mail
+                </button>
+    <div class="text-muted" style="text-align: center; margin-top: 0.75rem; font-size: 0.75rem;"><span data-i18n="txt_origin">Test will originate from:</span> <strong>45.122.223.116</strong></div>
+                </div>
             </form>
         </div>
+    </div>
 
-        <div class="card mt-2">
-            <h3 class="card-title">Log Tracking Tips</h3>
-            <ul class="muted small" style="line-height: 1.6;">
-                <li>The panel parses <code>mail.log</code> and <code>journalctl</code>.</li>
-                <li>Delivery "sent" means the remote server accepted the mail.</li>
-                <li>"deferred" means temporary failure (retry later).</li>
-                <li>"bounced" means permanent rejection.</li>
-            </ul>
+    <!-- Right Column: Queue & Trace -->
+    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        <div class="ops-card" style="border-top: 4px solid var(--purple);">
+            <div class="ops-card-header">
+                <h3 class="ops-card-title" data-i18n="ttl_queue_pipeline">Mail Queue Pipeline</h3>
+            </div>
+            <div class="ops-card-body">
+                <div style="background: var(--bg-elevated); padding: 1.25rem; border-radius: 6px; border: 1px solid var(--border); margin-bottom: 1rem;">
+                    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-light);">
+                            <span data-i18n="lbl_active_q">Active Queue</span>
+                            <span class="badge badge-blue">{{ queue.active if queue else 0 }}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-light);">
+                            <span data-i18n="lbl_deferred_q">Deferred Queue</span>
+                            <span class="badge badge-{% if queue and queue.deferred > 0 %}red{% else %}green{% endif %}">{{ queue.deferred if queue else 0 }}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span data-i18n="lbl_hold_q">Hold Queue</span>
+                            <span class="badge badge-gray">{{ queue.hold if queue else 0 }}</span>
+                        </div>
+                    </div>
+                </div>
+                <form action="/diagnostics/queue/flush" method="post" onsubmit="return confirmFlush()">
+                    <button type="submit" class="btn btn-secondary btn-full" data-i18n="btn_flush_q_full">⟳ Flush Delivery Queue</button>
+                </form>
+            </div>
         </div>
+
+        {% if request.query_params.get('msg_id') %}
+        <div class="ops-card" style="border-top: 4px solid var(--accent);">
+            <div class="ops-card-header">
+                <h3 class="ops-card-title"><span data-i18n="ttl_realtime_trace">Real-Time Trace</span>: <span class="text-accent mono" style="font-size: 0.8rem;">{% if request.query_params.get('msg_id') %}{{ request.query_params.get('msg_id')[:8] }}{% endif %}...</span></h3>
+            </div>
+            <div class="ops-card-body">
+                <div id="trace-msg-id" style="display: none;">{{ request.query_params.get('msg_id') }}</div>
+                <div id="trace-results" style="background: #000; color: #10d9a0; font-family: var(--ff-mono); font-size: 0.75rem; padding: 1rem; border-radius: 4px; border: 1px solid #1a1a1a; min-height: 150px; overflow-y: auto; max-height: 350px;">
+                    <div class="text-muted" data-i18n="txt_telemetry_init">Initializing trace telemetry...</div>
+                </div>
+                <button onclick="pollTrace()" class="btn btn-secondary btn-xs mt-1" style="width: 100%;" data-i18n="btn_refresh_trace">Refresh Trace Logs</button>
+            </div>
+        </div>
+        {% endif %}
     </div>
 
 </div>
-
 {% endblock %}
 
 {% block scripts %}
 <script>
+    function confirmFlush() {
+        const t = translations[localStorage.getItem('language') || 'vn'];
+        return confirm(t['txt_flush_confirm']);
+    }
+
     async function pollTrace() {
-        const msgId = document.getElementById('trace-msg-id').textContent;
+        const msgIdEl = document.getElementById('trace-msg-id');
+        if (!msgIdEl) return;
+        const msgId = msgIdEl.textContent;
         const results = document.getElementById('trace-results');
+        const t = translations[localStorage.getItem('rp_lang') || 'vn'];
         
         try {
-            const response = await fetch('/diagnostics/trace/' + msgId);
-            const data = await response.json();
+            const res = await fetch('/diagnostics/trace/' + msgId);
+            const data = await res.json();
             
             if (data.length === 0) {
-                results.innerHTML = '<span class="muted">No logs found yet. Waiting for Postfix...</span>';
+                results.innerHTML = `<div class="text-muted">${t['status_scanning']}</div>`;
                 return;
             }
             
             results.innerHTML = data.map(ev => {
-                if (ev.error) return `<div class="flash-error">Error: ${ev.error}</div>`;
+                if (ev.error) return `<div style="color:var(--red)">[ERROR] ${ev.error}</div>`;
                 if (ev.raw) return `<div>${ev.raw}</div>`;
-                return `<div><span class="timestamp">[${ev.time}]</span> <b>${ev.qid}</b>: ${ev.info}</div>`;
+                return `<div><span style="color:var(--text-muted)">[${ev.time}]</span> <span style="color:var(--accent)">${ev.qid}</span>: ${ev.info}</div>`;
             }).join('');
+            results.scrollTop = results.scrollHeight;
             
         } catch (err) {
-            results.textContent = 'Failed to fetch trace data.';
+            results.textContent = t['status_telemetry_lost'];
         }
     }
 
-    // Auto-poll if we just sent a test
     if (document.getElementById('trace-msg-id')) {
         pollTrace();
-        setInterval(pollTrace, 5000); // Every 5s
+        setInterval(pollTrace, 5000);
     }
 </script>
-<style>
-    .text-blue { color: #3498db; }
-    .text-danger { color: #e74c3c; }
-    .mb-2 { margin-bottom: 20px; }
-</style>
 {% endblock %}

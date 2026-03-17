@@ -67,13 +67,46 @@ def get_message_history(msg_id_snippet: str, limit: int = 50) -> List[Dict[str, 
     return events
 
 def get_queue_status() -> Dict[str, Any]:
-    """Get Postfix queue summary using mailq."""
+    """Get Postfix queue summary and breakdown counts."""
+    status = {
+        "summary": "Queue is empty",
+        "active": 0,
+        "deferred": 0,
+        "hold": 0,
+        "incoming": 0
+    }
+    
+    if os.name == 'nt':
+        status["summary"] = "N/A (Windows Dev)"
+        return status
+
     try:
+        # Use qshape or count files in spool if available
+        # But for basics, we parse 'mailq'
         res = subprocess.run("mailq | tail -n 1", shell=True, capture_output=True, text=True)
-        # Expected: "-- 0 Kbytes in 0 Requests."
-        return {"summary": res.stdout.strip() or "Queue is empty"}
-    except:
-        return {"summary": "Unknown (mailq failed)"}
+        line = res.stdout.strip()
+        if line:
+            status["summary"] = line
+            # Parse "-- 10 Kbytes in 5 Requests."
+            match = re.search(r"in (\d+) Request", line)
+            if match:
+                # We can't easily distinguish from just the summary line
+                # So we'll put them in active for now or actually try to count
+                # In most real setups, we'd use 'qshape'
+                pass
+        
+        # Actual count from spool (requires permissions)
+        for qtype in ["active", "deferred", "hold", "incoming"]:
+            q_path = f"/var/spool/postfix/{qtype}"
+            if os.path.exists(q_path):
+                # Count files recursively
+                count = sum([len(files) for r, d, files in os.walk(q_path)])
+                status[qtype] = count
+
+    except Exception as e:
+        status["summary"] = f"Error: {str(e)}"
+        
+    return status
 
 def flush_queue() -> bool:
     """Flush Postfix queue."""

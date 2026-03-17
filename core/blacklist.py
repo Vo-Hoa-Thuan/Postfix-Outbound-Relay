@@ -139,21 +139,43 @@ def process_ip_blacklist_alert(ip_address: str, force_refresh: bool = False):
     return result
 
 def auto_check_all():
-    """Background loop entry point."""
+    """Background loop entry point - optimized to be faster and non-blocking."""
     settings = get_settings()
-    interval_hours = settings.get("blacklist_check_interval", 12)
+    # Support intervals from 1m to 24h
+    interval_hours = settings.get("blacklist_check_interval", 6)
     
     LAST_CHECK_FILE = os.path.join(BASE_DIR, "runtime", "last_auto_check.json")
-    last_check_data = read_json(LAST_CHECK_FILE, {"last_check": 0})
+    last_check_data = read_json(LAST_CHECK_FILE, {"last_check": 0, "status": "idle"})
     
-    if time.time() - last_check_data.get("last_check", 0) < (interval_hours * 3600):
+    now = time.time()
+    if now - last_check_data.get("last_check", 0) < (interval_hours * 3600):
         return
         
+    print(f"[Blacklist] Starting scheduled check (Interval: {interval_hours}h)...")
+    last_check_data["status"] = "running"
+    last_check_data["start_at"] = now
+    write_json(LAST_CHECK_FILE, last_check_data)
+    
     config = read_json(RELAY_IPS_FILE, {"ips": []})
+    blacklisted_count = 0
+    checked_count = 0
+    
     for ip_data in config.get("ips", []):
-        if ip_data.get("enabled", True):
-            process_ip_blacklist_alert(ip_data.get("ip"))
-            time.sleep(2) # be nice to API
+        ip = ip_data.get("ip")
+        if ip_data.get("enabled", True) or ip_data.get("blacklist_status") == "BLACKLISTED":
+            res = process_ip_blacklist_alert(ip)
+            checked_count += 1
+            if res.get("is_blacklisted"):
+                blacklisted_count += 1
+            time.sleep(1) # Small delay
             
-    write_json(LAST_CHECK_FILE, {"last_check": time.time()})
+    summary = {
+        "last_check": time.time(),
+        "status": "completed",
+        "checked": checked_count,
+        "blacklisted": blacklisted_count,
+        "took_seconds": int(time.time() - now)
+    }
+    write_json(LAST_CHECK_FILE, summary)
+    print(f"[Blacklist] Check completed. Found {blacklisted_count} issues.")
 

@@ -1,255 +1,340 @@
 {% extends "base.html" %}
 {% set active_page = "dashboard" %}
 
-{% block title %}Dashboard – Postfix Relay Panel{% endblock %}
-{% block page_title %}Dashboard{% endblock %}
+{% block title %}Operations Console – Postfix Relay Panel{% endblock %}
 
 {% block content %}
-<!-- ── Blacklist Warning ── -->
-<div id="blacklist-warning" style="{% if not blacklisted_ips %}display:none;{% endif %} margin-bottom: 20px;">
-    <div class="card" style="border-left: 5px solid var(--danger); background: rgba(239, 68, 68, 0.1);">
-        <h3 style="color: var(--danger); display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-            ⚠️ <span>CRITICAL: Blacklisted IPs Detected</span>
-        </h3>
-        <p class="muted">The following IPs have been automatically disabled to protect your reputation:</p>
-        <ul id="blacklisted-list" style="margin-top: 10px; list-style: none; padding: 0;">
-            {% for ip in blacklisted_ips %}
-            <li style="padding: 5px 10px; background: rgba(239, 68, 68, 0.1); border-radius: 4px; display: inline-block; margin-right: 10px; margin-bottom: 5px;" class="mono">
-                {{ ip.ip }}
-            </li>
-            {% endfor %}
-        </ul>
-        <div style="margin-top: 15px;">
-            <a href="/ips" class="btn btn-xs btn-danger">Manage IPs</a>
+<!-- ── Quick Warnings ────────────────────────────────────────────────── -->
+<div id="quick-warnings">
+    {% if blacklisted_ips %}
+    <div class="flash flash-error mb-2" style="position: static; max-width: 100%; animation: none;">
+        <strong data-i18n="alert_sec">⚠️ Security Alert:</strong> <span data-i18n="txt_bl_detected">Blacklisted IPs detected. They have been automatically disabled.</span>
+        <a href="/ips" class="btn btn-secondary btn-xs ml-1" data-i18n="nav_ips">Manage IPs</a>
+    </div>
+    {% endif %}
+    {% if postfix_status != 'running' %}
+    <div class="flash flash-error mb-2" style="position: static; max-width: 100%; animation: none;">
+        <strong data-i18n="alert_crit">🚨 Critical:</strong> <span data-i18n="txt_postfix_stopped">Postfix service is STOPPED. Outbound mail is currently down.</span>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ── Health Bar ────────────────────────────────────────────────────── -->
+<div class="ops-health-bar">
+    <div class="health-status-card {% if postfix_status == 'running' %}good{% else %}crit{% endif %}">
+        <span class="health-label" data-i18n="lbl_postfix">System: Postfix</span>
+        <span class="health-value" data-status="{{ postfix_status }}" data-i18n="status_{{ postfix_status.lower() }}">
+            {{ postfix_status | upper }}
+        </span>
+    </div>
+    <div class="health-status-card {% if rspamd_status == 'running' %}good{% else %}crit{% endif %}">
+        <span class="health-label" data-i18n="lbl_rspamd">System: Rspamd</span>
+        <span class="health-value" data-status="{{ rspamd_status }}" data-i18n="status_{{ rspamd_status.lower() }}">
+            {{ rspamd_status | upper }}
+        </span>
+    </div>
+    <div class="health-status-card good">
+        <span class="health-label" data-i18n="lbl_perf_sent">Performance: Sent (1h)</span>
+        <span class="health-value">{{ total_sent }}</span>
+    </div>
+    <div class="health-status-card {% if total_deferred > 10 %}warn{% else %}good{% endif %}">
+        <span class="health-label" data-i18n="lbl_health_deferred">Health: Deferred (1h)</span>
+        <span class="health-value">{{ total_deferred }}</span>
+    </div>
+    <div class="health-status-card good">
+        <span class="health-label" data-i18n="lbl_relay_active">Relay: Active IP</span>
+        <span class="health-value mono" style="font-size: 0.95rem;">{{ active_ip }}</span>
+    </div>
+    <div class="health-status-card good">
+        <span class="health-label" data-i18n="lbl_rot_trigger">Rotation: Trigger</span>
+        <span class="health-value" id="countdown">{{ time_remaining }}s</span>
+    </div>
+</div>
+
+<!-- ── Main Dashboard Grid ───────────────────────────────────────────── -->
+<div class="dashboard-grid">
+    
+    <!-- Left: Activity Feed (Priority 1) -->
+    <div class="ops-card">
+        <div class="ops-card-header">
+            <h3 class="ops-card-title" data-i18n="ttl_activity">📡 Latest SMTP Activity</h3>
+            <div style="display: flex; gap: 0.5rem;">
+                <button onclick="refreshLogs()" class="btn btn-secondary btn-xs" id="refreshBtn" data-i18n="btn_refresh">Refresh</button>
+                <a href="/logs" class="btn btn-secondary btn-xs" data-i18n="btn_view_all">View All</a>
+            </div>
+        </div>
+        <div class="ops-card-body">
+            <table class="ops-table" id="logTable">
+                <thead>
+                    <tr>
+                        <th data-i18n="col_time">Time</th>
+                        <th data-i18n="col_from_to">From / To</th>
+                        <th data-i18n="col_subject">Subject</th>
+                        <th data-i18n="col_relay_ip">Relay IP</th>
+                        <th data-i18n="col_status">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="logBody">
+                    {% for log in recent_logs %}
+                    <tr>
+                        <td class="mono">{{ log.time.split(' ')[1] }}</td>
+                        <td>
+                            <div class="ellipsis mono" style="max-width: 250px;">{{ log.from }}</div>
+                            <div class="ellipsis mono text-muted" style="max-width: 250px;">{{ log.to }}</div>
+                        </td>
+                        <td><div class="ellipsis" style="max-width: 200px;" title="{{ log.subject }}">{{ log.subject or '—' }}</div></td>
+                        <td class="mono">{{ log.local_ip or '—' }}</td>
+                        <td>
+                            <span class="ops-badge ops-badge-{{ log.status }}" data-status="{{ log.status }}" data-i18n="status_{{ log.status.lower() }}">{{ log.status | upper }}</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
-</div>
 
-<!-- ── Status Cards ─────────────────────────────────────────────────── -->
-<div class="cards-grid">
-
-    <div class="card stat-card">
-        <div class="stat-label" data-i18n="lbl_postfix">Postfix</div>
-        <div class="stat-value">
-            <span class="badge badge-{% if postfix_status == 'running' %}green{% else %}red{% endif %}">
-                {{ postfix_status | upper }}
-            </span>
+    <!-- Right: Stats & Chart -->
+    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        
+        <!-- Activity Chart -->
+        <div class="ops-card">
+            <div class="ops-card-header">
+                <h3 class="ops-card-title" data-i18n="ttl_perf_24h">📊 24h Performance</h3>
+            </div>
+            <div class="ops-card-body" style="padding: 1rem; height: 250px;">
+                <canvas id="activityChart"></canvas>
+            </div>
         </div>
-        <div class="stat-icon">📮</div>
-    </div>
 
-    <div class="card stat-card">
-        <div class="stat-label" data-i18n="lbl_rspamd">Rspamd</div>
-        <div class="stat-value">
-            <span class="badge badge-{% if rspamd_status == 'running' %}green{% else %}red{% endif %}">
-                {{ rspamd_status | upper }}
-            </span>
+        <!-- Per-IP Send Info -->
+        <div class="ops-card">
+            <div class="ops-card-header">
+                <h3 class="ops-card-title" data-i18n="ttl_per_ip_load">🔗 Per-IP Load</h3>
+            </div>
+            <div class="ops-card-body">
+                <table class="ops-table">
+                    <thead>
+                        <tr>
+                            <th data-i18n="col_ip">IP</th>
+                            <th data-i18n="col_count_1h">Count (1h)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if counters %}
+                            {% for ip, data in counters.items() %}
+                            <tr>
+                                <td class="mono">{{ ip }}</td>
+                                <td><strong>{{ data.count }}</strong></td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr><td colspan="2" class="text-muted" style="text-align:center" data-i18n="txt_no_activity">No activity this hour.</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
         </div>
-        <div class="stat-icon">🛡</div>
-    </div>
 
-    <div class="card stat-card">
-        <div class="stat-label" data-i18n="lbl_active_ip">Active IP</div>
-        <div class="stat-value mono">{{ active_ip }}</div>
-        <div class="stat-sub">
-            {% if active_ip_cfg %}
-            Weight {{ active_ip_cfg.weight }} · Limit {{ active_ip_cfg.limit_per_hour }}/hr
-            {% endif %}
+        <!-- Quick Rotation Action -->
+        <div class="ops-card" style="background: var(--accent-glow); border-color: var(--accent);">
+            <div class="ops-card-body" style="padding: 1.25rem; text-align: center;">
+                <p class="mb-2" style="font-size: 0.9rem; font-weight: 500;" data-i18n="txt_force_rot">Bypass rotation timer and force switch now.</p>
+                <form action="/rotation/trigger" method="post">
+                    <button type="submit" class="btn btn-primary btn-full" data-i18n="btn_force_rot">⟳ Force Rotate IP</button>
+                </form>
+            </div>
         </div>
-        <div class="stat-icon">🔗</div>
+
     </div>
-
-    <div class="card stat-card">
-        <div class="stat-label" data-i18n="lbl_next_rot">Next Rotation</div>
-        <div class="stat-value" id="countdown" data-remaining="{{ time_remaining }}">{{ time_remaining }}s</div>
-        <div class="stat-sub">Mode: {{ rotation_mode }} · Interval: {{ rotation_secs }}s</div>
-        <div class="stat-icon">↻</div>
-    </div>
-
-    <div class="card stat-card">
-        <div class="stat-label" data-i18n="lbl_sent_h">Sent (this hour)</div>
-        <div class="stat-value">{{ total_sent }}</div>
-        <div class="stat-icon">📤</div>
-    </div>
-
-    <div class="card stat-card">
-        <div class="stat-label" data-i18n="lbl_deferred_h">Deferred (this hour)</div>
-        <div class="stat-value warn">{{ total_deferred }}</div>
-        <div class="stat-icon">⏳</div>
-    </div>
-
 </div>
 
-
-<!-- ── Analytics Chart ────────────────────────────────────────────────── -->
-<div class="section-header">
-    <h2 data-i18n="lbl_analytics_24h">Sending Activity (Last 24 Hours)</h2>
-</div>
-<div class="card">
-    <canvas id="activityChart" style="width:100%; height:300px;"></canvas>
-</div>
-
-<!-- ── Per-IP Counters ──────────────────────────────────────────────── -->
-{% if counters %}
-<div class="section-header">
-    <h2 data-i18n="lbl_ip_counters">Per-IP Send Counters (Current Hour)</h2>
-</div>
-<div class="card">
-    <table class="data-table">
-        <thead>
-            <tr>
-                <th data-i18n="col_ip">IP Address</th>
-                <th data-i18n="col_sent_h">Sent This Hour</th>
-                <th data-i18n="col_window">Window Start</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for ip, data in counters.items() %}
-            <tr>
-                <td class="mono">{{ ip }}</td>
-                <td><strong>{{ data.count }}</strong></td>
-                <td class="mono muted">{{ data.window }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-{% else %}
-<div class="empty-state">
-    <p data-i18n="lbl_no_activity">No send activity recorded this hour.</p>
-</div>
-{% endif %}
-
-<!-- ── Quick Actions ────────────────────────────────────────────────── -->
-<div class="section-header">
-    <h2 data-i18n="lbl_quick_actions">Quick Actions</h2>
-</div>
-<div class="quick-actions">
-    <a href="/ips" class="btn btn-secondary" data-i18n="btn_manage_ips">Manage IPs</a>
-    <a href="/rotation" class="btn btn-secondary" data-i18n="btn_rotation_set">Rotation Settings</a>
-    <a href="/rspamd" class="btn btn-secondary" data-i18n="btn_rspamd_cfg">Rspamd Config</a>
-    <a href="/logs" class="btn btn-secondary" data-i18n="btn_view_logs">View SMTP Logs</a>
-    <form action="/rotation/trigger" method="post" style="display:inline">
-        <button type="submit" class="btn btn-accent" data-i18n="btn_force_rotate">⟳ Force IP Rotation Now</button>
-    </form>
-</div>
 {% endblock %}
 
 {% block scripts %}
-<script>
-    const countdownEl = document.getElementById('countdown');
-    
-    function updateDashboard() {
-        fetch('/api/status')
-            .then(res => res.json())
-            .then(data => {
-                // Update countdown
-                countdownEl.textContent = data.time_remaining + 's';
-                
-                // Update active IP block
-                const statCards = document.querySelectorAll('.stat-card');
-                
-                // Update postfix badge
-                const postBadge = statCards[0].querySelector('.badge');
-                postBadge.className = 'badge badge-' + (data.postfix_status === 'running' ? 'green' : 'red');
-                postBadge.textContent = data.postfix_status.toUpperCase();
-                
-                // Update rspamd badge
-                const rspBadge = statCards[1].querySelector('.badge');
-                rspBadge.className = 'badge badge-' + (data.rspamd_status === 'running' ? 'green' : 'red');
-                rspBadge.textContent = data.rspamd_status.toUpperCase();
-                
-                // Update Active IP
-                statCards[2].querySelector('.stat-value').textContent = data.active_ip;
-                if (data.active_ip_cfg) {
-                    let subText = `Weight ${data.active_ip_cfg.weight} · Limit ${data.active_ip_cfg.limit_per_hour}/hr`;
-                    if (data.active_ip_cfg.smtp_user) {
-                        subText += ` · Auth: ${data.active_ip_cfg.smtp_user}`;
-                    }
-                    statCards[2].querySelector('.stat-sub').textContent = subText;
-                }
-                
-                // Update rotation mode/sec
-                statCards[3].querySelector('.stat-sub').textContent = `Mode: ${data.rotation_mode} · Interval: ${data.rotation_secs}s`;
-                
-                // Update counters
-                statCards[4].querySelector('.stat-value').textContent = data.total_sent;
-                statCards[5].querySelector('.stat-value').textContent = data.total_deferred;
-
-                const warnBox = document.getElementById('blacklist-warning');
-                if (warnBox) {
-                    warnBox.style.display = (data.blacklisted_count > 0) ? 'block' : 'none';
-                }
-
-                if (data.time_remaining === 0) {
-                    countdownEl.textContent = 'Rotating...';
-                    // Optional: slow down poll temporarily or let it catch the new config on next tick
-                }
-            })
-            .catch(err => console.error("Error fetching status:", err));
-    }
-
-    // Call fetch immediately and then every 1 second
-    updateDashboard();
-    setInterval(updateDashboard, 1000);
-</script>
-
-<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
+    // ── Log Polling & Refresh ──────────────────────────────────────────
+    async function refreshLogs() {
+        const btn = document.getElementById('refreshBtn');
+        btn.disabled = true;
+        btn.textContent = '...';
+
+        try {
+            const res = await fetch('/api/logs');
+            const logs = await res.json();
+            const body = document.getElementById('logBody');
+            body.innerHTML = '';
+            
+            logs.forEach(log => {
+                const row = `<tr>
+                    <td class="mono">${log.time.split(' ')[1]}</td>
+                    <td>
+                        <div class="ellipsis mono" style="max-width: 250px;">${log.from}</div>
+                        <div class="ellipsis mono text-muted" style="max-width: 250px;">${log.to}</div>
+                    </td>
+                    <td><div class="ellipsis" style="max-width: 200px;" title="${log.subject}">${log.subject || '—'}</div></td>
+                    <td class="mono">${log.local_ip || '—'}</td>
+                    <td>
+                        <span class="ops-badge ops-badge-${log.status}">${log.status}</span>
+                    </td>
+                </tr>`;
+                body.insertAdjacentHTML('beforeend', row);
+            });
+        } catch(e) { console.error(e); }
+        
+        btn.disabled = false;
+        btn.textContent = translations[localStorage.getItem('rp_lang') || 'vn']['btn_refresh'];
+    }
+
+    // --- Optimized Polling with Locking ---
+    let isPollingStatus = false;
+    async function pollStatus() {
+        if (isPollingStatus) return;
+        isPollingStatus = true;
+        try {
+            const res = await fetch('/api/status');
+            const data = await res.json();
+            
+            // 1. Update Countdown
+            const countdownEl = document.getElementById('countdown');
+            if (countdownEl) countdownEl.textContent = data.time_remaining + 's';
+            
+            // 2. Update Health Badges
+            const hCards = document.querySelectorAll('.health-status-card');
+            if (hCards.length >= 4) {
+                hCards[0].className = `health-status-card ${data.postfix_status.toLowerCase() === 'running' ? 'good' : 'crit'}`;
+                hCards[0].querySelector('.health-value').textContent = getI18nStatus(data.postfix_status);
+                
+                hCards[1].className = `health-status-card ${data.rspamd_status.toLowerCase() === 'running' ? 'good' : 'crit'}`;
+                hCards[1].querySelector('.health-value').textContent = getI18nStatus(data.rspamd_status);
+                
+                hCards[2].querySelector('.health-value').textContent = data.total_sent;
+                hCards[3].querySelector('.health-value').textContent = data.total_deferred;
+                if (hCards[4]) hCards[4].querySelector('.health-value').textContent = data.active_ip;
+            }
+
+            // 3. Update Blacklist Warnings
+            const warnBox = document.getElementById('quick-warnings');
+            if (warnBox) {
+                if (data.blacklisted_count > 0) {
+                    const lang = localStorage.getItem('rp_lang') || 'vn';
+                    const t = translations[lang];
+                    warnBox.innerHTML = `<div class="alert alert-danger" style="margin-bottom: 1.5rem; border-left: 4px solid #ef4444;">
+                        <i class="fas fa-exclamation-triangle"></i> 
+                        <strong>${t['alert_bl_title']}:</strong> ${data.blacklisted_count} ${t['txt_bl_alert_msg']}
+                    </div>`;
+                    warnBox.style.display = 'block';
+                } else {
+                    warnBox.style.display = 'none';
+                }
+            }
+            
+        } catch(e) { console.error("Status poll failed:", e); }
+        finally { isPollingStatus = false; }
+    }
+    // Status poll: 15s (Backend logic is stable enough)
+    setInterval(pollStatus, 15000);
+
+    // Activity Refresh: 8s
+    let isRefreshingLogs = false;
+    async function refreshLogs() {
+        if (isRefreshingLogs) return;
+        const btn = document.querySelector('.btn-refresh-logs'); // Optional if manual btn exists
+        isRefreshingLogs = true;
+        try {
+            const res = await fetch('/api/logs');
+            const data = await res.json();
+            const body = document.getElementById('logBody');
+            if (!body) return;
+            body.innerHTML = '';
+            data.forEach(entry => {
+                const statusClass = entry.status === 'sent' ? 'status-sent' : 
+                                  (entry.status === 'deferred' ? 'status-deferred' : 'status-bounced');
+                const row = `
+                    <tr>
+                        <td class="text-muted small">${entry.time.split(' ')[1] || entry.time}</td>
+                        <td><div class="log-subject truncate" title="${entry.from}">${entry.from}</div></td>
+                        <td><div class="log-subject truncate" title="${entry.to}">${entry.to}</div></td>
+                        <td><span class="ops-badge ops-badge-${entry.status}">${getI18nStatus(entry.status)}</span></td>
+                    </tr>`;
+                body.insertAdjacentHTML('beforeend', row);
+            });
+        } catch(e) { console.error("Log refresh failed:", e); }
+        finally { isRefreshingLogs = false; }
+    }
+    setInterval(refreshLogs, 8000);
+
+    // ── Activity Chart [Optimized Update] ────────────────
+    let mailChart = null;
+    function initChart() {
         const ctx = document.getElementById('activityChart').getContext('2d');
-        let chartInstance = null;
+        const isLight = document.body.classList.contains('light');
+        const textColor = isLight ? '#475569' : '#94a3b8';
+        const gridColor = isLight ? '#e2e8f0' : '#1e2d4d';
 
         fetch('/api/chart')
             .then(res => res.json())
             .then(data => {
-                chartInstance = new Chart(ctx, {
+                mailChart = new Chart(ctx, {
                     type: 'line',
                     data: {
                         labels: data.labels,
                         datasets: [
                             {
-                                label: 'Sent',
+                                label: translations[localStorage.getItem('rp_lang') || 'vn']['lbl_chart_sent'],
                                 data: data.datasets.sent,
-                                borderColor: 'rgb(75, 192, 192)',
-                                backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                                borderColor: '#06b6d4',
+                                backgroundColor: 'rgba(6, 182, 212, 0.1)',
                                 tension: 0.3,
-                                fill: true
+                                fill: true,
+                                borderWidth: 2
                             },
                             {
-                                label: 'Deferred',
+                                label: translations[localStorage.getItem('rp_lang') || 'vn']['lbl_chart_deferred'],
                                 data: data.datasets.deferred,
-                                borderColor: 'rgb(255, 159, 64)',
-                                backgroundColor: 'transparent',
+                                borderColor: '#fbbf24',
                                 tension: 0.3,
-                                borderDash: [5, 5]
-                            },
-                            {
-                                label: 'Bounced',
-                                data: data.datasets.bounced,
-                                borderColor: 'rgb(255, 99, 132)',
-                                backgroundColor: 'transparent',
-                                tension: 0.3
+                                borderDash: [4, 4],
+                                fill: false
                             }
                         ]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        interaction: {
-                            mode: 'index',
-                            intersect: false,
+                        animation: { duration: 0 }, // Disable initial animation for performance
+                        plugins: {
+                            legend: { display: false }
                         },
                         scales: {
-                            y: {
-                                beginAtZero: true
+                            x: { grid: { display: false }, ticks: { color: textColor, font: { family: 'Inter' } } },
+                            y: { 
+                                grid: { color: gridColor }, 
+                                beginAtZero: true, 
+                                ticks: { color: textColor, font: { family: 'Fira Code', size: 10 } } 
                             }
                         }
                     }
                 });
-            })
-            .catch(err => console.error("Error loading chart data:", err));
-    });
+            });
+    }
+
+    async function updateChart() {
+        if (!mailChart) return;
+        try {
+            const res = await fetch('/api/chart');
+            const data = await res.json();
+            if (data.labels && data.labels.length > 0) {
+                mailChart.data.labels = data.labels;
+                mailChart.data.datasets[0].data = data.datasets.sent;
+                mailChart.data.datasets[1].data = data.datasets.deferred;
+                mailChart.update('none'); // Update without animation
+            }
+        } catch(e) {}
+    }
+
+    document.addEventListener("DOMContentLoaded", initChart);
+    setInterval(updateChart, 60000); // Update chart every 1 minute
 </script>
 {% endblock %}
