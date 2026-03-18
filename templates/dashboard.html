@@ -57,27 +57,40 @@
                 <table class="ops-table compact">
                     <thead>
                         <tr>
-                            <th data-i18n="col_ip">IP</th>
-                            <th data-i18n="col_status">Status</th>
-                            <th data-i18n="col_sent">Sent (1h)</th>
-                            <th data-i18n="col_active">Active</th>
+                            <th data-i18n="col_ip">IP / Hostname</th>
+                            <th data-i18n="col_status">Relay</th>
+                            <th>Blacklist</th>
+                            <th>Details</th>
+                            <th data-i18n="col_sent">Sent</th>
+                            <th data-i18n="col_active">Act</th>
                         </tr>
                     </thead>
                     <tbody id="ip-table-body">
                         {% for ip_cfg in all_ips %}
                         <tr class="{% if active_ip == ip_cfg.ip %}active-row{% endif %}">
-                            <td class="mono">{{ ip_cfg.ip }}</td>
-                            <td>
+                            <td class="mono" style="padding: 0.5rem 0.75rem;">
+                                <div style="font-weight: 700;">{{ ip_cfg.ip }}</div>
+                                {% if ip_cfg.hostname %}<div style="font-size: 0.7rem; color: var(--text-muted); opacity: 0.8;">{{ ip_cfg.hostname }}</div>{% endif %}
+                            </td>
+                            <td style="padding: 0.5rem 0.75rem;">
                                 {% if not ip_cfg.enabled %}
-                                <span class="ops-badge" style="background: #475569; color: #fff;">DISABLED</span>
-                                {% elif ip_cfg.blacklist_status == 'BLACKLISTED' %}
-                                <span class="ops-badge ops-badge-bounced">BLACKLISTED</span>
+                                <span class="badge badge-gray" style="font-size: 0.65rem;">OFFLINE</span>
                                 {% else %}
-                                <span class="ops-badge ops-badge-sent">ONLINE</span>
+                                <span class="badge badge-green" style="font-size: 0.65rem;">ONLINE</span>
                                 {% endif %}
                             </td>
-                            <td class="mono"><strong>{{ counters.get(ip_cfg.ip, {}).get("count", 0) }}</strong></td>
-                            <td style="text-align: center;">{% if active_ip == ip_cfg.ip %}🟢{% endif %}</td>
+                            <td style="padding: 0.5rem 0.75rem;">
+                                {% set bl = ip_cfg.blacklist_status or 'CLEAN' %}
+                                <span class="badge badge-{% if bl == 'CLEAN' %}green{% elif bl == 'BLACKLISTED' %}red{% else %}yellow{% endif %}" style="font-size: 0.65rem;">
+                                    {{ bl }}
+                                </span>
+                            </td>
+                            <td style="padding: 0.5rem 0.75rem; font-size: 0.7rem; line-height: 1.2; color: var(--text-muted);">
+                                <div>W:{{ ip_cfg.weight }} | L:{{ ip_cfg.limit_per_hour }}</div>
+                                {% if ip_cfg.note %}<div class="ellipsis" style="max-width: 100px;">{{ ip_cfg.note }}</div>{% endif %}
+                            </td>
+                            <td class="mono" style="padding: 0.5rem 0.75rem;"><strong>{{ counters.get(ip_cfg.ip, {}).get("count", 0) }}</strong></td>
+                            <td style="text-align: center; padding: 0.5rem 0.75rem;">{% if active_ip == ip_cfg.ip %}🟢{% endif %}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
