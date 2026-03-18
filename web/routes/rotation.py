@@ -48,13 +48,27 @@ async def save_rotation(
 
 
 @router.post("/trigger")
-async def trigger_rotation():
+async def trigger_rotation(request: Request):
     """Manually force an IP rotation now."""
     from core.relay import get_active_ip, select_next_ip
     from core.postfix import sync_transport
+    from core.rotation import get_time_remaining
+    
     current = get_active_ip()
     new_ip  = select_next_ip(current_ip=current["ip"] if current else None)
+    
     if new_ip:
         sync_transport(new_ip)
+        # Check if requested via AJAX
+        if "application/json" in request.headers.get("accept", ""):
+            return {
+                "success": True, 
+                "new_ip": new_ip, 
+                "time_remaining": get_time_remaining(),
+                "msg": f"Rotated to {new_ip}"
+            }
         return RedirectResponse(f"/rotation?msg=Rotated+to+{new_ip}", status_code=303)
+    
+    if "application/json" in request.headers.get("accept", ""):
+        return {"success": False, "error": "No enabled IPs available"}
     return RedirectResponse("/rotation?error=No+enabled+IPs+available", status_code=303)

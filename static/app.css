@@ -25,19 +25,25 @@
   --blue-bg: rgba(56, 189, 248, .1);
   --purple: #818cf8;
 
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
 
   --nav-h: 64px;
-  --radius: 6px;
-  --radius-lg: 10px;
-  --shadow: 0 4px 32px rgba(0, 0, 0, .5);
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, .4);
+  --radius: 4px;
+  --radius-lg: 6px;
+  --shadow: 0 4px 20px rgba(0, 0, 0, .4);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, .3);
 
-  --ff-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --ff-mono: 'JetBrains Mono', 'Fira Code', monospace;
-  --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --ff-sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --ff-mono: 'Consolas', 'Monaco', monospace;
+  --base-font-size: 14px;
+
+  /* Dashboard Grid / Spacing */
+  --dash-gap: 1.25rem;
+  --panel-pad: 1.25rem;
+  --card-radius: 6px;
+  --transition: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 body.light {
@@ -75,6 +81,7 @@ body {
   font-family: var(--ff-sans);
   background: var(--bg-base);
   color: var(--text-primary);
+  font-size: var(--base-font-size);
   line-height: 1.5;
   min-height: 100vh;
   display: flex;
@@ -91,7 +98,7 @@ a:hover { color: var(--accent-hover); }
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  padding: 0 2rem;
+  padding: 0 1rem;
   position: sticky;
   top: 0;
   z-index: 100;
@@ -102,25 +109,26 @@ a:hover { color: var(--accent-hover); }
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin-right: 3rem;
+  margin-right: 1.5rem;
   flex-shrink: 0;
 }
 
 .logo-icon {
-  width: 32px;
-  height: 32px;
+  width: 48px;
+  height: 48px;
   background: linear-gradient(135deg, var(--accent), var(--purple));
-  border-radius: 8px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
+  font-size: 1.5rem;
   font-weight: bold;
 }
 
 .logo-text {
   font-weight: 800;
-  font-size: 1.1rem;
+  font-size: 1.4rem;
   letter-spacing: -0.02em;
   background: linear-gradient(90deg, #fff, var(--accent));
   background-clip: text;
@@ -138,16 +146,21 @@ a:hover { color: var(--accent-hover); }
 }
 
 .nav-tab {
-  padding: 0.5rem 1rem;
+  padding: 0.4rem 1rem;
   border-radius: var(--radius);
   color: var(--text-secondary);
-  font-weight: 500;
-  font-size: 0.95rem;
+  font-weight: 600;
+  font-size: 1.05rem;
   transition: var(--transition);
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
   white-space: nowrap;
+}
+
+.nav-tab .icon {
+  font-size: 1.25rem;
+  opacity: 0.9;
 }
 
 .nav-tab:hover {
@@ -173,8 +186,10 @@ a:hover { color: var(--accent-hover); }
 
 .clock-box {
   font-family: var(--ff-mono);
-  font-size: 0.85rem;
-  color: var(--text-muted);
+  font-size: 1.15rem;
+  color: var(--accent);
+  margin-right: 1.5rem;
+  font-weight: 600;
   background: var(--bg-elevated);
   padding: 0.3rem 0.75rem;
   border-radius: var(--radius);
@@ -183,29 +198,68 @@ a:hover { color: var(--accent-hover); }
 
 /* ── Content ─────────────────────────────────────────────────────────────── */
 .main-content {
-  padding: 2rem;
-  max-width: 1600px;
+  padding: 1rem 1.5rem;
+  max-width: 100%;
   width: 100%;
-  margin: 0 auto;
+  margin: 0;
   flex: 1;
 }
 
 /* ── Operations Console: Health Bar ───────────────────────────────────────── */
 .ops-health-bar {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 1rem;
-  margin-bottom: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.form-input, .form-select {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  width: 100%;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.form-input:focus, .form-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.form-input::placeholder {
+  color: var(--text-muted);
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #0f172a; /* Dark text on bright accent button */
+  border: none;
+  font-weight: 700;
+}
+
+.btn-secondary {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+.btn-xs {
+  padding: 0.35rem 0.85rem;
+  font-size: 0.85rem;
 }
 
 .health-status-card {
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  padding: 1rem;
+  padding: 0.75rem;
   border-radius: var(--radius-lg);
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.25rem;
   position: relative;
   overflow: hidden;
 }
@@ -265,44 +319,56 @@ a:hover { color: var(--accent-hover); }
 }
 
 .ops-card-header, .card-title {
-  padding: 1rem 1.25rem;
+  padding: 0.85rem 1rem;
   border-bottom: 1px solid var(--border);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.95rem;
+  font-size: 1.1rem;
   font-weight: 700;
 }
 
-.ops-card-body, .card-body {
-  padding: 1.25rem;
+.ops-card-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
+.ops-card-body, .card-body {
+  padding: 0.75rem 1rem;
+}
+
+/* ── Tables (High Density) ─────────────────────────────────────────── */
 .ops-table, .data-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.85rem;
+  font-size: 1rem;
 }
 
 .ops-table th, .data-table th {
-  background: var(--bg-elevated);
   text-align: left;
   padding: 0.75rem 1rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  font-size: 0.75rem;
+  background: var(--bg-elevated);
+  border-bottom: 2px solid var(--border);
+  color: var(--text-primary);
+  font-weight: 700;
   text-transform: uppercase;
-  border-bottom: 1px solid var(--border);
+  letter-spacing: 0.05em;
+  font-size: 0.85rem;
 }
 
 .ops-table td, .data-table td {
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--border-light);
-  color: var(--text-primary);
-  white-space: nowrap;
+  color: var(--text-secondary);
+  vertical-align: middle;
 }
 
 .ops-table tr:hover, .data-table tr:hover { background: var(--bg-hover); }
+.ops-table tr.active-row, .data-table tr.active-row { background: var(--bg-elevated); font-weight: bold; }
 
 /* ── Badges ─────────────────────────────────────────────────────────────── */
 .ops-badge, .badge {

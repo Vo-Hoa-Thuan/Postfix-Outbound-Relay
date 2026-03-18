@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% block title %}Postfix Relay Panel{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/app.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/app.css?v=2026.1" />
   <script>
     (function () {
       var t = localStorage.getItem('rp_theme') || 'dark';
@@ -23,26 +23,23 @@
     </div>
 
     <nav class="nav-tabs">
-      <a href="/" class="nav-tab {% if active_page == 'dashboard' %}active{% endif %}" data-i18n="nav_dashboard">
-        <span class="icon">⬡</span> <span>Dashboard</span>
+      <a href="/" class="nav-tab {% if active_page == 'dashboard' %}active{% endif %}">
+        <span class="icon">⬡</span> <span data-i18n="nav_dashboard">Dashboard</span>
       </a>
-      <a href="/ips" class="nav-tab {% if active_page == 'ips' %}active{% endif %}" data-i18n="nav_ips">
-        <span class="icon">◈</span> <span>IP Management</span>
+      <a href="/ips" class="nav-tab {% if active_page == 'ips' %}active{% endif %}">
+        <span class="icon">◈</span> <span data-i18n="nav_ips">IP Management</span>
       </a>
-      <a href="/rotation" class="nav-tab {% if active_page == 'rotation' %}active{% endif %}" data-i18n="nav_rotation">
-        <span class="icon">↻</span> <span>Rotation</span>
+      <a href="/rotation" class="nav-tab {% if active_page == 'rotation' %}active{% endif %}">
+        <span class="icon">↻</span> <span data-i18n="nav_rotation">Rotation</span>
       </a>
-      <a href="/rspamd" class="nav-tab {% if active_page == 'rspamd' %}active{% endif %}" data-i18n="nav_rspamd">
-        <span class="icon">⚙</span> <span>Rspamd</span>
+      <a href="/rspamd" class="nav-tab {% if active_page == 'rspamd' %}active{% endif %}">
+        <span class="icon">⚙</span> <span data-i18n="nav_rspamd">Rspamd</span>
       </a>
-      <a href="/logs" class="nav-tab {% if active_page == 'logs' %}active{% endif %}" data-i18n="nav_logs">
-        <span class="icon">≡</span> <span>SMTP Monitor</span>
+      <a href="/diagnostics" class="nav-tab {% if active_page == 'diagnostics' %}active{% endif %}">
+        <span class="icon">🩺</span> <span data-i18n="nav_diag">Diagnostics</span>
       </a>
-      <a href="/diagnostics" class="nav-tab {% if active_page == 'diagnostics' %}active{% endif %}" data-i18n="nav_diag">
-        <span class="icon">🩺</span> <span>Diagnostics</span>
-      </a>
-      <a href="/settings" class="nav-tab {% if active_page == 'settings' %}active{% endif %}" data-i18n="nav_settings">
-        <span class="icon">⚙️</span> <span>Settings</span>
+      <a href="/settings" class="nav-tab {% if active_page == 'settings' %}active{% endif %}">
+        <span class="icon">⚙️</span> <span data-i18n="nav_settings">Settings</span>
       </a>
     </nav>
 

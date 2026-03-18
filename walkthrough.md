@@ -15,7 +15,13 @@ This document summarizes the changes made to the Postfix Outbound Relay Panel to
 ### 2. Relay Access Denied
 - **Problem**: Emails from Kerio server (`103.3.244.183`) were rejected.
 - **Cause**: IP not present in Postfix `mynetworks` whitelist.
-- **Solution**: Guided the user to add the IP in **Systems Settings** -> **Relay Access**.
+- **Solution**:
+    - [x] UI Redesign & Stability
+    - [x] Fix font variable mismatch in `app.css`
+    - [x] Refine `dashboard.html` for "Pure Dark" look
+    - [x] Eliminate all white backgrounds (inputs, headers)
+    - [x] Boost Menu font size to `1.35rem`
+    - [x] Updated `walkthrough.md`
 
 ## Validation Results
 
@@ -27,6 +33,13 @@ This document summarizes the changes made to the Postfix Outbound Relay Panel to
 - [x] IP `103.3.244.183` added to `mynetworks`.
 - [x] `logs/reader.py` updated to latest version via `git pull`.
 - [x] VPS permissions fixed (`chmod 644`) for Kerio log folders.
+
+## UI: Pure Dark Console (v2.2)
+- **Eliminated White Backgrounds**: Replaced all hardcoded `white` and `#fff` backgrounds (inputs, dropdowns, table headers) with `slate-800/700` for a seamless dark look.
+- **Unified Tone**: Every component now follows the same dark color palette, removing "islands" of white.
+- **High Contrast Focus**: Using `slate-50` for primary text and `sky-400` for accents ensures perfect legibility.
+
+## Operations Console Refinement (v2.0)
 
 ## Previous Changes (Archives)
 

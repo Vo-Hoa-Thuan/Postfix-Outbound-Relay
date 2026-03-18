@@ -33,7 +33,6 @@ from web.routes.dashboard import router as dashboard_router
 from web.routes.ips       import router as ips_router
 from web.routes.rotation  import router as rotation_router
 from web.routes.rspamd    import router as rspamd_router
-from web.routes.logs      import router as logs_router
 from web.routes.settings  import router as settings_router
 from web.routes.diagnostics import router as diagnostics_router
 
@@ -41,7 +40,6 @@ app.include_router(dashboard_router)
 app.include_router(ips_router)
 app.include_router(rotation_router)
 app.include_router(rspamd_router)
-app.include_router(logs_router)
 app.include_router(settings_router)
 app.include_router(diagnostics_router)
 

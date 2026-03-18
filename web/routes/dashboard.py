@@ -61,6 +61,7 @@ async def dashboard(request: Request):
     from core.relay     import get_active_ip, get_total_sent_this_hour, get_all_counters
     from core.rotation  import get_time_remaining
     from core.fileio    import read_json
+    from core.tracking  import get_queue_status
     
     active_ip_cfg  = get_active_ip()
     active_ip      = active_ip_cfg["ip"] if active_ip_cfg else "—"
@@ -70,11 +71,31 @@ async def dashboard(request: Request):
     counters       = get_all_counters()
     deferred       = _count_deferred_this_hour()
     total_sent     = get_total_sent_this_hour()
+    queue_status   = get_queue_status()
     
     # Blacklist Alerts
     RELAY_IPS_FILE = os.path.join(BASE_DIR, "config", "relay_ips.json")
-    all_ips = read_json(RELAY_IPS_FILE, {"ips": []}).get("ips", [])
-    blacklisted_ips = [ip for ip in all_ips if ip.get("blacklist_status") == "BLACKLISTED"]
+    all_ips_cfg = read_json(RELAY_IPS_FILE, {"ips": []}).get("ips", [])
+    blacklisted_ips = [ip for ip in all_ips_cfg if ip.get("blacklist_status") == "BLACKLISTED"]
+    
+    # Summary stats for the new header strip
+    stats = {
+        "active_ips": len([ip for ip in all_ips_cfg if ip.get("enabled", True)]),
+        "disabled_ips": len([ip for ip in all_ips_cfg if not ip.get("enabled", True)]),
+        "blacklisted_ips": len(blacklisted_ips),
+        "queue_size": queue_status.get("active", 0) + queue_status.get("deferred", 0),
+        "total_sent_1h": total_sent,
+        "total_deferred_1h": deferred
+    }
+
+    # Fetch unique local IPs for the filter dropdown
+    recent_for_stats = _read_recent_logs(1000)
+    unique_local_ips = sorted(list(set(l.get("local_ip") for l in recent_for_stats if l.get("local_ip"))))
+
+    # Top stats logic
+    from collections import Counter
+    top_senders = Counter(l.get("from") for l in recent_for_stats if l.get("from")).most_common(10)
+    top_ips     = Counter(l.get("local_ip") for l in recent_for_stats if l.get("local_ip")).most_common(20)
 
     return templates.TemplateResponse("dashboard.html", {
         "request":         request,
@@ -82,17 +103,40 @@ async def dashboard(request: Request):
         "rspamd_status":   rspamd_status(),
         "active_ip":       active_ip,
         "active_ip_cfg":   active_ip_cfg,
-        "time_remaining":  time_remaining,
-        "total_sent":      total_sent,
-        "total_deferred":  deferred,
+        "all_ips":         all_ips_cfg,
         "counters":        counters,
-        "blacklisted_ips": blacklisted_ips,
-        "recent_logs":     _read_recent_logs(15),
+        "time_remaining":  time_remaining,
+        "stats":           stats,
+        "recent_logs":     recent_for_stats[:50],
+        "unique_ips":      unique_local_ips,
+        "top_senders":     top_senders,
+        "top_ips":         top_ips,
+        "active_page":     "dashboard"
     })
 
 @router.get("/api/logs")
-async def api_logs():
-    return _read_recent_logs(15)
+async def api_logs(
+    ip: str = "",
+    status: str = "",
+    sender: str = "",
+    recipient: str = "",
+    limit: int = 50
+):
+    """Enhanced logs API with filtering."""
+    # Read more lines if we are filtering
+    read_limit = 1000 if (ip or status or sender or recipient) else limit
+    logs = _read_recent_logs(read_limit)
+    
+    filtered = []
+    for l in logs:
+        if ip and l.get("local_ip") != ip: continue
+        if status and l.get("status") != status: continue
+        if sender and sender.lower() not in l.get("from", "").lower(): continue
+        if recipient and recipient.lower() not in l.get("to", "").lower(): continue
+        filtered.append(l)
+        if len(filtered) >= limit: break
+        
+    return filtered
 
 @router.get("/api/status")
 async def api_status():
@@ -101,10 +145,13 @@ async def api_status():
     from core.relay     import get_active_ip, get_total_sent_this_hour
     from core.rotation  import get_time_remaining
     from core.fileio    import read_json
+    from core.tracking  import get_queue_status
 
     active_ip_cfg = get_active_ip()
     config = read_json(os.path.join(BASE_DIR, "config", "relay_ips.json"), {"ips": []})
-    blacklisted = [ip for ip in config.get("ips", []) if ip.get("blacklist_status") == "BLACKLISTED"]
+    all_ips = config.get("ips", [])
+    blacklisted = [ip for ip in all_ips if ip.get("blacklist_status") == "BLACKLISTED"]
+    queue_status = get_queue_status()
     
     return {
         "postfix_status":  postfix_status(),
@@ -113,7 +160,13 @@ async def api_status():
         "time_remaining":  get_time_remaining(),
         "total_sent":      get_total_sent_this_hour(),
         "total_deferred":  _count_deferred_this_hour(),
-        "blacklisted_count": len(blacklisted)
+        "blacklisted_count": len(blacklisted),
+        "stats": {
+            "active_ips": len([ip for ip in all_ips if ip.get("enabled", True)]),
+            "disabled_ips": len([ip for ip in all_ips if not ip.get("enabled", True)]),
+            "blacklisted_ips": len(blacklisted),
+            "queue_size": queue_status.get("active", 0) + queue_status.get("deferred", 0)
+        }
     }
 
 @router.get("/api/chart")

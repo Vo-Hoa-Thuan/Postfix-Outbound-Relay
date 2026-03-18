@@ -4,89 +4,197 @@
 {% block title %}Operations Console – Postfix Relay Panel{% endblock %}
 
 {% block content %}
-<!-- ── Quick Warnings ────────────────────────────────────────────────── -->
-<div id="quick-warnings">
-    {% if blacklisted_ips %}
-    <div class="flash flash-error mb-2" style="position: static; max-width: 100%; animation: none;">
-        <strong data-i18n="alert_sec">⚠️ Security Alert:</strong> <span data-i18n="txt_bl_detected">Blacklisted IPs detected. They have been automatically disabled.</span>
-        <a href="/ips" class="btn btn-secondary btn-xs ml-1" data-i18n="nav_ips">Manage IPs</a>
-    </div>
-    {% endif %}
-    {% if postfix_status != 'running' %}
-    <div class="flash flash-error mb-2" style="position: static; max-width: 100%; animation: none;">
-        <strong data-i18n="alert_crit">🚨 Critical:</strong> <span data-i18n="txt_postfix_stopped">Postfix service is STOPPED. Outbound mail is currently down.</span>
-    </div>
-    {% endif %}
-</div>
-
-<!-- ── Health Bar ────────────────────────────────────────────────────── -->
-<div class="ops-health-bar">
+<!-- ── Operations Header Strip ──────────────────────────────────────── -->
+<div class="ops-health-bar" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));">
     <div class="health-status-card {% if postfix_status == 'running' %}good{% else %}crit{% endif %}">
         <span class="health-label" data-i18n="lbl_postfix">System: Postfix</span>
-        <span class="health-value" data-status="{{ postfix_status }}" data-i18n="status_{{ postfix_status.lower() }}">
-            {{ postfix_status | upper }}
-        </span>
+        <span class="health-value" id="stat-postfix">{{ postfix_status | upper }}</span>
     </div>
     <div class="health-status-card {% if rspamd_status == 'running' %}good{% else %}crit{% endif %}">
         <span class="health-label" data-i18n="lbl_rspamd">System: Rspamd</span>
-        <span class="health-value" data-status="{{ rspamd_status }}" data-i18n="status_{{ rspamd_status.lower() }}">
-            {{ rspamd_status | upper }}
-        </span>
+        <span class="health-value" id="stat-rspamd">{{ rspamd_status | upper }}</span>
     </div>
     <div class="health-status-card good">
-        <span class="health-label" data-i18n="lbl_perf_sent">Performance: Sent (1h)</span>
-        <span class="health-value">{{ total_sent }}</span>
+        <span class="health-label" data-i18n="lbl_active_ips">Active IPs</span>
+        <span class="health-value" id="stat-active-ips">{{ stats.active_ips }}</span>
     </div>
-    <div class="health-status-card {% if total_deferred > 10 %}warn{% else %}good{% endif %}">
-        <span class="health-label" data-i18n="lbl_health_deferred">Health: Deferred (1h)</span>
-        <span class="health-value">{{ total_deferred }}</span>
-    </div>
-    <div class="health-status-card good">
-        <span class="health-label" data-i18n="lbl_relay_active">Relay: Active IP</span>
-        <span class="health-value mono" style="font-size: 0.95rem;">{{ active_ip }}</span>
+    <div class="health-status-card {% if stats.blacklisted_ips > 0 %}crit{% else %}good{% endif %}">
+        <span class="health-label" data-i18n="lbl_blacklisted_ips">Blacklisted</span>
+        <span class="health-value" id="stat-blacklisted-ips">{{ stats.blacklisted_ips }}</span>
     </div>
     <div class="health-status-card good">
-        <span class="health-label" data-i18n="lbl_rot_trigger">Rotation: Trigger</span>
-        <span class="health-value" id="countdown">{{ time_remaining }}s</span>
-        <span id="countdown-init" data-remaining="{{ time_remaining }}" style="display:none"></span>
+        <span class="health-label" data-i18n="lbl_queue_size">Queue Size</span>
+        <span class="health-value" id="stat-queue-size">{{ stats.queue_size }}</span>
     </div>
-</div>
-
-<!-- ── Main Dashboard Grid ───────────────────────────────────────────── -->
-<div class="dashboard-grid">
-    
-    <!-- Left: Activity Feed (Priority 1) -->
-    <div class="ops-card">
-        <div class="ops-card-header">
-            <h3 class="ops-card-title" data-i18n="ttl_activity">📡 Latest SMTP Activity</h3>
-            <div style="display: flex; gap: 0.5rem;">
-                <button onclick="refreshLogs()" class="btn btn-secondary btn-xs" id="refreshBtn" data-i18n="btn_refresh">Refresh</button>
-                <a href="/logs" class="btn btn-secondary btn-xs" data-i18n="btn_view_all">View All</a>
+    <div class="health-status-card good">
+        <span class="health-label" data-i18n="lbl_sent_1h">Sent (1h)</span>
+        <span class="health-value" id="stat-sent-1h">{{ stats.total_sent_1h }}</span>
+    </div>
+            <div class="health-status-card good">
+                <span class="health-label" data-i18n="lbl_rot_trigger">Rotation</span>
+                <span class="health-value" id="countdown">{{ time_remaining }}s</span>
+                <span class="health-label" style="margin-left:0.5rem;" data-i18n="lbl_current_ip">IP</span>
+                <span class="health-value" id="stat-current-ip">{{ active_ip }}</span>
             </div>
         </div>
-        <div class="ops-card-body">
+
+        <div class="dashboard-grid" style="grid-template-columns: 1fr; gap: 1rem;">
+    <!-- ── Upper Section: IPs & Quick Actions ────────────────────────── -->
+    <div style="display: grid; grid-template-columns: 1fr 350px; gap: 1rem;">
+        <div class="ops-card">
+            <div class="ops-card-header">
+                <h3 class="ops-card-title"><span data-i18n="ttl_relay_ips">🔗 Relay IPs</span></h3>
+                <div style="display: flex; gap: 0.5rem;">
+                    <form onsubmit="handleRotate(event)" style="display: inline;">
+                        <button type="submit" id="rotateBtn" class="btn btn-primary btn-xs">⟳ Force Rotate</button>
+                    </form>
+                    <a href="/ips" class="btn btn-secondary btn-xs" data-i18n="nav_ips">Manage</a>
+                </div>
+            </div>
+            <div class="ops-card-body" style="padding: 0;">
+                <table class="ops-table">
+                    <thead>
+                        <tr>
+                            <th data-i18n="col_ip">IP</th>
+                            <th data-i18n="col_status">Status</th>
+                            <th data-i18n="col_sent">Sent (1h)</th>
+                            <th data-i18n="col_active">Active</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ip-table-body">
+                        {% for ip_cfg in all_ips %}
+                        <tr class="{% if active_ip == ip_cfg.ip %}active-row{% endif %}">
+                            <td class="mono">{{ ip_cfg.ip }}</td>
+                            <td>
+                                {% if not ip_cfg.enabled %}
+                                <span class="ops-badge" style="background: #475569; color: #fff;">DISABLED</span>
+                                {% elif ip_cfg.blacklist_status == 'BLACKLISTED' %}
+                                <span class="ops-badge ops-badge-bounced">BLACKLISTED</span>
+                                {% else %}
+                                <span class="ops-badge ops-badge-sent">ONLINE</span>
+                                {% endif %}
+                            </td>
+                            <td class="mono"><strong>{{ counters.get(ip_cfg.ip, {}).get("count", 0) }}</strong></td>
+                            <td style="text-align: center;">{% if active_ip == ip_cfg.ip %}🟢{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                        {% if not all_ips %}
+                        <tr><td colspan="4" style="text-align: center; padding: 2rem; color: var(--text-muted);">No IPs configured. <a href="/ips">Add some now.</a></td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="ops-card">
+            <div class="ops-card-header"><h3 class="ops-card-title" data-i18n="ttl_perf_24h">📊 Performance</h3></div>
+            <div class="ops-card-body" style="padding: 0.5rem; height: 180px;">
+                <canvas id="activityChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Stats Section: Top Senders & IPs ────────────────────────── -->
+    <div class="dashboard-grid" style="grid-template-columns: 1fr 2fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+        <div class="ops-card">
+            <div class="ops-card-header">
+                <h3 class="ops-card-title" style="color: var(--text-primary); font-size: 1.1rem;">Top 10 Senders</h3>
+            </div>
+            <div class="ops-card-body" style="padding: 1rem;">
+                <div style="display: grid; gap: 0.75rem;">
+                    {% for sender, count in top_senders %}
+                    <div style="display: flex; justify-content: space-between; font-size: 1rem; border-bottom: 1px solid var(--border-light); padding-bottom: 0.4rem;">
+                        <span class="ellipsis" style="max-width: 180px; color: var(--text-secondary); font-weight: 500;">{{ sender }}</span>
+                        <span class="mono" style="color: var(--accent); font-weight: 700;">{{ count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="ops-card">
+            <div class="ops-card-header">
+                <h3 class="ops-card-title" style="color: var(--text-primary); font-size: 1.1rem;">Top Relay IPs</h3>
+            </div>
+            <div class="ops-card-body" style="padding: 1rem;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem 2rem;">
+                    {% for ip, count in top_ips %}
+                    <div style="display: flex; justify-content: space-between; font-size: 1rem; border-bottom: 1px solid var(--border-light); padding-bottom: 0.4rem;">
+                        <span style="color: var(--text-secondary); font-weight: 500;">{{ ip }}</span>
+                        <span class="mono" style="color: var(--accent); font-weight: 700;">{{ count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Lower Section: Unified Log Activity ───────────────────────── -->
+    <div class="ops-card">
+        <div class="ops-card-header" style="padding: 1rem 1.25rem;">
+            <div style="display: flex; align-items: center; gap: 2rem;">
+                <h3 class="ops-card-title" style="color: var(--text-primary); font-size: 1.2rem;">📡 Activity Feed</h3>
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <span style="color: var(--text-secondary); font-size: 0.9rem; font-weight: 600; text-transform: uppercase;">Relay:</span>
+                    <select class="form-select btn-xs" style="width: 160px;" id="filter-ip-top" onchange="refreshLogs()">
+                        <option value="">ALL IPs</option>
+                        {% for uip in unique_ips %}
+                        <option value="{{ uip }}">{{ uip }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div style="color: var(--text-muted); font-size: 0.95rem;">Showing <strong>{{ recent_logs|length }}</strong> entries</div>
+            </div>
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                <span id="log-status" style="color: var(--text-muted); font-size: 0.85rem;">Last update: Just now</span>
+                <button onclick="refreshLogs()" class="btn btn-primary btn-xs">Refresh Now</button>
+            </div>
+        </div>
+        <div class="ops-card-body" style="padding: 0; min-height: 600px; overflow-x: auto;">
             <table class="ops-table" id="logTable">
                 <thead>
                     <tr>
-                        <th data-i18n="col_time">Time</th>
-                        <th data-i18n="col_from_to">From / To</th>
-                        <th data-i18n="col_subject">Subject</th>
-                        <th data-i18n="col_relay_ip">Relay IP</th>
-                        <th data-i18n="col_status">Status</th>
+                        <th style="width: 120px;">TIME</th>
+                        <th>
+                            <div style="margin-bottom: 6px;">FROM</div>
+                            <input type="text" id="filter-sender" placeholder="Search..." class="form-input btn-xs" onkeyup="debounceRefresh()">
+                        </th>
+                        <th>
+                            <div style="margin-bottom: 6px;">TO</div>
+                            <input type="text" id="filter-recipient" placeholder="Search..." class="form-input btn-xs" onkeyup="debounceRefresh()">
+                        </th>
+                        <th>
+                            <div style="margin-bottom: 6px;">SUBJECT</div>
+                            <input type="text" id="filter-subject" placeholder="Search..." class="form-input btn-xs" onkeyup="debounceRefresh()">
+                        </th>
+                        <th style="width: 140px;">LOCAL IP</th>
+                        <th style="width: 120px;">STATUS</th>
                     </tr>
                 </thead>
                 <tbody id="logBody">
                     {% for log in recent_logs %}
-                    <tr>
-                        <td class="mono">{{ log.time.split(' ')[1] }}</td>
-                        <td>
-                            <div class="ellipsis mono" style="max-width: 250px;">{{ log.from }}</div>
-                            <div class="ellipsis mono text-muted" style="max-width: 250px;">{{ log.to }}</div>
-                        </td>
-                        <td><div class="ellipsis" style="max-width: 200px;" title="{{ log.subject }}">{{ log.subject or '—' }}</div></td>
-                        <td class="mono">{{ log.local_ip or '—' }}</td>
-                        <td>
-                            <span class="ops-badge ops-badge-{{ log.status }}" data-status="{{ log.status }}" data-i18n="status_{{ log.status.lower() }}">{{ log.status | upper }}</span>
+                    <tr class="log-row" onclick="toggleDetail(this)">
+                        <td class="small">{{ log.time }}</td>
+                        <td class="small">127.0.0.1</td> <!-- Placeholder or fetch if available -->
+                        <td><div class="ellipsis" style="max-width: 250px;" title="{{ log.from }}">{{ log.from }}</div></td>
+                        <td><div class="ellipsis" style="max-width: 250px;" title="{{ log.to }}">{{ log.to }}</div></td>
+                        <td><div class="ellipsis" style="max-width: 300px;" title="{{ log.subject }}">{{ log.subject or '—' }}</div></td>
+                        <td class="small">{{ log.local_ip or '—' }}</td>
+                        <td><span class="text-successful" style="color: #22c55e; font-weight: 700;">{{ log.status | upper }}</span></td>
+                    </tr>
+                    <tr class="log-detail" style="display: none; background: #f8fafc;">
+                        <td colspan="7" style="padding: 1rem;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                <div>
+                                    <div class="text-muted small uppercase">Message ID</div>
+                                    <div class="mono">{{ log.msgid or '—' }}</div>
+                                    <div class="text-muted small uppercase mt-2">Queue ID</div>
+                                    <div class="mono">{{ log.qid or '—' }}</div>
+                                </div>
+                                <div>
+                                    <div class="text-muted small uppercase">Full Response</div>
+                                    <div class="small">{{ log.response or log.reason or 'No detailed response available.' }}</div>
+                                </div>
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}
@@ -94,200 +202,213 @@
             </table>
         </div>
     </div>
-
-    <!-- Right: Stats & Chart -->
-    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
-        
-        <!-- Activity Chart -->
-        <div class="ops-card">
-            <div class="ops-card-header">
-                <h3 class="ops-card-title" data-i18n="ttl_perf_24h">📊 24h Performance</h3>
-            </div>
-            <div class="ops-card-body" style="padding: 1rem; height: 250px;">
-                <canvas id="activityChart"></canvas>
-            </div>
-        </div>
-
-        <!-- Per-IP Send Info -->
-        <div class="ops-card">
-            <div class="ops-card-header">
-                <h3 class="ops-card-title" data-i18n="ttl_per_ip_load">🔗 Per-IP Load</h3>
-            </div>
-            <div class="ops-card-body">
-                <table class="ops-table">
-                    <thead>
-                        <tr>
-                            <th data-i18n="col_ip">IP</th>
-                            <th data-i18n="col_count_1h">Count (1h)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% if counters %}
-                            {% for ip, data in counters.items() %}
-                            <tr>
-                                <td class="mono">{{ ip }}</td>
-                                <td><strong>{{ data.count }}</strong></td>
-                            </tr>
-                            {% endfor %}
-                        {% else %}
-                            <tr><td colspan="2" class="text-muted" style="text-align:center" data-i18n="txt_no_activity">No activity this hour.</td></tr>
-                        {% endif %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Quick Rotation Action -->
-        <div class="ops-card" style="background: var(--accent-glow); border-color: var(--accent);">
-            <div class="ops-card-body" style="padding: 1.25rem; text-align: center;">
-                <p class="mb-2" style="font-size: 0.9rem; font-weight: 500;" data-i18n="txt_force_rot">Bypass rotation timer and force switch now.</p>
-                <form action="/rotation/trigger" method="post">
-                    <button type="submit" class="btn btn-primary btn-full" data-i18n="btn_force_rot">⟳ Force Rotate IP</button>
-                </form>
-            </div>
-        </div>
-
-    </div>
 </div>
-
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    // ── Log Polling & Refresh ──────────────────────────────────────────
-    async function refreshLogs() {
-        const btn = document.getElementById('refreshBtn');
-        btn.disabled = true;
-        btn.textContent = '...';
-
-        try {
-            const res = await fetch('/api/logs');
-            const logs = await res.json();
-            const body = document.getElementById('logBody');
-            body.innerHTML = '';
-            
-            logs.forEach(log => {
-                const row = `<tr>
-                    <td class="mono">${log.time.split(' ')[1]}</td>
-                    <td>
-                        <div class="ellipsis mono" style="max-width: 250px;">${log.from}</div>
-                        <div class="ellipsis mono text-muted" style="max-width: 250px;">${log.to}</div>
-                    </td>
-                    <td><div class="ellipsis" style="max-width: 200px;" title="${log.subject}">${log.subject || '—'}</div></td>
-                    <td class="mono">${log.local_ip || '—'}</td>
-                    <td>
-                        <span class="ops-badge ops-badge-${log.status}">${log.status}</span>
-                    </td>
-                </tr>`;
-                body.insertAdjacentHTML('beforeend', row);
-            });
-        } catch(e) { console.error(e); }
-        
-        btn.disabled = false;
-        btn.textContent = translations[localStorage.getItem('rp_lang') || 'vn']['btn_refresh'];
-    }
-
-    // --- Manual Tick for smooth countdown ---
-    const countdownInit = document.getElementById('countdown-init');
-    let remainingTime = parseInt(countdownInit ? countdownInit.dataset.remaining : 0);
-    
-    function tick() {
-        const countdownEl = document.getElementById('countdown');
-        if (!countdownEl) return;
-        
-        if (remainingTime > 0) {
-            remainingTime--;
-            countdownEl.textContent = remainingTime + 's';
-        } else {
-            const t = translations[localStorage.getItem('rp_lang') || 'vn'];
-            countdownEl.textContent = t ? (t['status_pending'] || 'PENDING...') : 'PENDING...';
-        }
-    }
-    setInterval(tick, 1000);
-
-    // --- Optimized Polling with Locking ---
-    let isPollingStatus = false;
-    async function pollStatus() {
-        if (isPollingStatus) return;
-        isPollingStatus = true;
-        try {
-            const res = await fetch('/api/status');
-            const data = await res.json();
-            
-            // 1. Update Countdown
-            const countdownEl = document.getElementById('countdown');
-            if (countdownEl) {
-                remainingTime = data.time_remaining;
-                countdownEl.textContent = remainingTime + 's';
-            }
-            
-            // 2. Update Health Badges
-            const hCards = document.querySelectorAll('.health-status-card');
-            if (hCards.length >= 4) {
-                hCards[0].className = `health-status-card ${data.postfix_status.toLowerCase() === 'running' ? 'good' : 'crit'}`;
-                hCards[0].querySelector('.health-value').textContent = getI18nStatus(data.postfix_status);
-                
-                hCards[1].className = `health-status-card ${data.rspamd_status.toLowerCase() === 'running' ? 'good' : 'crit'}`;
-                hCards[1].querySelector('.health-value').textContent = getI18nStatus(data.rspamd_status);
-                
-                hCards[2].querySelector('.health-value').textContent = data.total_sent;
-                hCards[3].querySelector('.health-value').textContent = data.total_deferred;
-                if (hCards[4]) hCards[4].querySelector('.health-value').textContent = data.active_ip;
-            }
-
-            // 3. Update Blacklist Warnings
-            const warnBox = document.getElementById('quick-warnings');
-            if (warnBox) {
-                if (data.blacklisted_count > 0) {
-                    const lang = localStorage.getItem('rp_lang') || 'vn';
-                    const t = translations[lang];
-                    warnBox.innerHTML = `<div class="alert alert-danger" style="margin-bottom: 1.5rem; border-left: 4px solid #ef4444;">
-                        <i class="fas fa-exclamation-triangle"></i> 
-                        <strong>${t['alert_bl_title']}:</strong> ${data.blacklisted_count} ${t['txt_bl_alert_msg']}
-                    </div>`;
-                    warnBox.style.display = 'block';
-                } else {
-                    warnBox.style.display = 'none';
-                }
-            }
-            
-        } catch(e) { console.error("Status poll failed:", e); }
-        finally { isPollingStatus = false; }
-    }
-    // Status poll: 5s (Better for real-time feel)
-    setInterval(pollStatus, 5000);
-
-    // Activity Refresh: 5s
+    let logRefreshTimer = null;
     let isRefreshingLogs = false;
+
+    function debounceRefresh() {
+        clearTimeout(logRefreshTimer);
+        logRefreshTimer = setTimeout(refreshLogs, 500);
+    }
+
     async function refreshLogs() {
         if (isRefreshingLogs) return;
         isRefreshingLogs = true;
+        
+        const sender = document.getElementById('filter-sender').value;
+        const recipient = document.getElementById('filter-recipient').value;
+        const subject = document.getElementById('filter-subject').value;
+        const topIp = document.getElementById('filter-ip-top').value;
+        
         try {
-            const res = await fetch('/api/logs');
+            const params = new URLSearchParams({ limit: 50 });
+            if (sender) params.append('sender', sender);
+            if (recipient) params.append('recipient', recipient);
+            if (topIp) params.append('ip', topIp);
+            
+            const res = await fetch(`/api/logs?${params.toString()}`);
             const data = await res.json();
             const body = document.getElementById('logBody');
             if (!body) return;
+            
             body.innerHTML = '';
-            data.forEach(entry => {
-                const statusClass = entry.status === 'sent' ? 'status-sent' : 
-                                  (entry.status === 'deferred' ? 'status-deferred' : 'status-bounced');
+            data.forEach(log => {
+                if (subject && log.subject && !log.subject.toLowerCase().includes(subject.toLowerCase())) return;
+
+                const statusColor = log.status.toLowerCase() === 'sent' ? '#34d399' : 
+                                  log.status.toLowerCase() === 'deferred' ? '#fbbf24' : '#f87171';
+
                 const row = `
-                    <tr>
-                        <td class="text-muted small">${entry.time.split(' ')[1] || entry.time}</td>
-                        <td><div class="log-subject truncate" title="${entry.from}">${entry.from}</div></td>
-                        <td><div class="log-subject truncate" title="${entry.to}">${entry.to}</div></td>
-                        <td class="mono small">${entry.local_ip || '—'}</td>
-                        <td><span class="ops-badge ops-badge-${entry.status}">${getI18nStatus(entry.status)}</span></td>
+                    <tr class="log-row" onclick="toggleDetail(this)" style="border-bottom: 1px solid var(--border-light);">
+                        <td style="padding: 0.75rem; color: var(--text-muted); font-size: 0.9rem;">${log.time.split(' ')[1] || log.time}</td>
+                        <td style="padding: 0.75rem;"><div class="ellipsis mono" style="max-width: 250px; color: var(--text-primary); font-weight: 500;" title="${log.from}">${log.from}</div></td>
+                        <td style="padding: 0.75rem;"><div class="ellipsis mono" style="max-width: 250px; color: var(--text-primary); font-weight: 500;" title="${log.to}">${log.to}</div></td>
+                        <td style="padding: 0.75rem;"><div class="ellipsis" style="max-width: 300px; color: var(--text-secondary); font-size: 0.95rem;" title="${log.subject || ''}">${log.subject || '—'}</div></td>
+                        <td style="padding: 0.75rem;" class="mono small color-muted">${log.local_ip || '—'}</td>
+                        <td style="padding: 0.75rem;"><span style="color: ${statusColor}; font-weight: 800; font-size: 0.9rem;">${log.status.toUpperCase()}</span></td>
+                    </tr>
+                    <tr class="log-detail" style="display: none; background: #0f172a;">
+                        <td colspan="6" style="padding: 1.5rem; border-bottom: 3px solid var(--accent);">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                                <div>
+                                    <div class="text-muted small uppercase" style="font-weight: 700; margin-bottom: 4px;">Message ID</div>
+                                    <div class="mono small" style="word-break: break-all;">${log.msgid || '—'}</div>
+                                    <div class="text-muted small uppercase" style="font-weight: 700; margin-top: 12px; margin-bottom: 4px;">Queue ID</div>
+                                    <div class="mono small">${log.qid || '—'}</div>
+                                </div>
+                                <div>
+                                    <div class="text-muted small uppercase" style="font-weight: 700; margin-bottom: 4px;">Full Server Response</div>
+                                    <div class="small" style="color: var(--text-secondary); line-height: 1.4;">${log.response || log.reason || '—'}</div>
+                                </div>
+                            </div>
+                        </td>
                     </tr>`;
                 body.insertAdjacentHTML('beforeend', row);
             });
+            document.getElementById('log-status').textContent = 'Last update: ' + new Date().toLocaleTimeString();
         } catch(e) { console.error("Log refresh failed:", e); }
         finally { isRefreshingLogs = false; }
     }
-    setInterval(refreshLogs, 5000);
 
-    // ── Activity Chart [Optimized Update] ────────────────
+    function toggleDetail(row) {
+        const detail = row.nextElementSibling;
+        if (detail && detail.classList.contains('log-detail')) {
+            detail.style.display = detail.style.display === 'none' ? 'table-row' : 'none';
+        }
+    }
+
+    // --- Status Polling ---
+    let remainingTime = parseInt("{{ time_remaining or 0 }}") || 0;
+    async function pollStatus() {
+        try {
+            // Add cache buster
+            const res = await fetch('/api/status?t=' + Date.now());
+            const data = await res.json();
+            
+            remainingTime = data.time_remaining;
+            document.getElementById('countdown').textContent = remainingTime + 's';
+            
+            // Update Current IP Label
+            if (document.getElementById('stat-current-ip')) {
+                document.getElementById('stat-current-ip').textContent = data.active_ip;
+            }
+
+            // Update Table Row Highlighting
+            const rows = document.querySelectorAll('#ip-table-body tr');
+            rows.forEach(row => {
+                const ipCell = row.querySelector('td.mono');
+                if (ipCell && row.cells.length >= 4) {
+                    const rowIp = ipCell.textContent.trim();
+                    const activeCell = row.cells[3];
+                    if (rowIp === data.active_ip) {
+                        row.classList.add('active-row');
+                        if (activeCell) activeCell.textContent = '🟢';
+                    } else {
+                        row.classList.remove('active-row');
+                        if (activeCell) activeCell.textContent = '';
+                    }
+                }
+            });
+
+            // Update Summary Strip
+            if (document.getElementById('stat-postfix')) {
+                const pf = document.getElementById('stat-postfix');
+                pf.textContent = data.postfix_status.toUpperCase();
+                pf.parentElement.className = `health-status-card ${data.postfix_status.toLowerCase() === 'running' ? 'good' : 'crit'}`;
+            }
+            if (document.getElementById('stat-rspamd')) {
+                const rs = document.getElementById('stat-rspamd');
+                rs.textContent = data.rspamd_status.toUpperCase();
+                rs.parentElement.className = `health-status-card ${data.rspamd_status.toLowerCase() === 'running' ? 'good' : 'crit'}`;
+            }
+
+            if (document.getElementById('stat-active-ips')) document.getElementById('stat-active-ips').textContent = data.stats.active_ips;
+            if (document.getElementById('stat-blacklisted-ips')) document.getElementById('stat-blacklisted-ips').textContent = data.stats.blacklisted_ips;
+            if (document.getElementById('stat-queue-size')) document.getElementById('stat-queue-size').textContent = data.stats.queue_size;
+            if (document.getElementById('stat-sent-1h')) document.getElementById('stat-sent-1h').textContent = data.total_sent;
+
+            if (document.getElementById('poll-indicator')) {
+                document.getElementById('poll-indicator').textContent = 'Update: ' + new Date().toLocaleTimeString();
+            }
+
+            const blVal = document.getElementById('stat-blacklisted-ips');
+            if (blVal) {
+                const blCard = blVal.parentElement;
+                blCard.className = `health-status-card ${data.stats.blacklisted_ips > 0 ? 'crit' : 'good'}`;
+            }
+            
+        } catch(e) { console.error("Status poll failed:", e); }
+    }
+
+    async function handleRotate(event) {
+        event.preventDefault();
+        const btn = document.getElementById('rotateBtn');
+        const oldText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Rotating...';
+        btn.style.opacity = '0.7';
+
+        try {
+            const res = await fetch('/rotation/trigger', { 
+                method: 'POST',
+                headers: { 'Accept': 'application/json' }
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                // INSTANT UI UPDATE
+                remainingTime = data.time_remaining || remainingTime;
+                document.getElementById('countdown').textContent = remainingTime + 's';
+                
+                if (document.getElementById('stat-current-ip')) {
+                    document.getElementById('stat-current-ip').textContent = data.new_ip;
+                }
+
+                // Update Table Highlighting instantly
+                const rows = document.querySelectorAll('#ip-table-body tr');
+                rows.forEach(row => {
+                    const ipCell = row.querySelector('td.mono');
+                    if (ipCell && row.cells.length >= 4) {
+                        const rowIp = ipCell.textContent.trim();
+                        const activeCell = row.cells[3];
+                        if (rowIp === data.new_ip) {
+                            row.classList.add('active-row');
+                            if (activeCell) activeCell.textContent = '🟢';
+                        } else {
+                            row.classList.remove('active-row');
+                            if (activeCell) activeCell.textContent = '';
+                        }
+                    }
+                });
+            }
+            
+            // Still poll to sync other stats
+            setTimeout(pollStatus, 500); 
+        } catch(e) {
+            console.error("Rotation failed:", e);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = oldText;
+            btn.style.opacity = '1';
+        }
+    }
+
+    setInterval(() => {
+        if (remainingTime > 0) {
+            remainingTime--;
+            document.getElementById('countdown').textContent = remainingTime + 's';
+        }
+    }, 1000);
+
+    setInterval(pollStatus, 1500); 
+    setInterval(refreshLogs, 10000);
+
+    // --- Chart Initialization ---
     let mailChart = null;
     function initChart() {
         const ctx = document.getElementById('activityChart').getContext('2d');
@@ -304,37 +425,27 @@
                         labels: data.labels,
                         datasets: [
                             {
-                                label: translations[localStorage.getItem('rp_lang') || 'vn']['lbl_chart_sent'],
+                                label: 'Sent',
                                 data: data.datasets.sent,
                                 borderColor: '#06b6d4',
                                 backgroundColor: 'rgba(6, 182, 212, 0.1)',
                                 tension: 0.3,
                                 fill: true,
-                                borderWidth: 2
-                            },
-                            {
-                                label: translations[localStorage.getItem('rp_lang') || 'vn']['lbl_chart_deferred'],
-                                data: data.datasets.deferred,
-                                borderColor: '#fbbf24',
-                                tension: 0.3,
-                                borderDash: [4, 4],
-                                fill: false
+                                borderWidth: 2,
+                                pointRadius: 0
                             }
                         ]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        animation: { duration: 0 }, // Disable initial animation for performance
-                        plugins: {
-                            legend: { display: false }
-                        },
+                        animation: false,
+                        plugins: { legend: { display: false } },
                         scales: {
-                            x: { grid: { display: false }, ticks: { color: textColor, font: { family: 'Inter' } } },
+                            x: { display: false },
                             y: { 
-                                grid: { color: gridColor }, 
-                                beginAtZero: true, 
-                                ticks: { color: textColor, font: { family: 'Fira Code', size: 10 } } 
+                                grid: { color: gridColor },
+                                ticks: { color: textColor, font: { size: 9 } }
                             }
                         }
                     }
@@ -342,21 +453,17 @@
             });
     }
 
-    async function updateChart() {
-        if (!mailChart) return;
-        try {
-            const res = await fetch('/api/chart');
-            const data = await res.json();
-            if (data.labels && data.labels.length > 0) {
-                mailChart.data.labels = data.labels;
-                mailChart.data.datasets[0].data = data.datasets.sent;
-                mailChart.data.datasets[1].data = data.datasets.deferred;
-                mailChart.update('none'); // Update without animation
-            }
-        } catch(e) {}
-    }
-
-    document.addEventListener("DOMContentLoaded", initChart);
-    setInterval(updateChart, 60000); // Update chart every 1 minute
+    // Initial call
+    document.addEventListener("DOMContentLoaded", () => {
+        initChart();
+        refreshLogs();
+        pollStatus();
+    });
 </script>
+<style>
+    .log-row { cursor: pointer; transition: background 0.1s; }
+    .log-row:hover { background: var(--bg-hover) !important; }
+    .uppercase { text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
+    .mt-2 { margin-top: 0.5rem; }
+</style>
 {% endblock %}
