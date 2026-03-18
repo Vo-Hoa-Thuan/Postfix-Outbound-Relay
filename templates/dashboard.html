@@ -30,17 +30,19 @@
         <span class="health-label" data-i18n="lbl_sent_1h">Sent (1h)</span>
         <span class="health-value" id="stat-sent-1h">{{ stats.total_sent_1h }}</span>
     </div>
-            <div class="health-status-card good">
-                <span class="health-label" data-i18n="lbl_rot_trigger">Rotation</span>
-                <span class="health-value" id="countdown">{{ time_remaining }}s</span>
-                <span class="health-label" style="margin-left:0.5rem;" data-i18n="lbl_current_ip">IP</span>
-                <span class="health-value" id="stat-current-ip">{{ active_ip }}</span>
-            </div>
-        </div>
+    <div class="health-status-card good">
+        <span class="health-label" data-i18n="lbl_rot_trigger">Rotation</span>
+        <span class="health-value" id="countdown">{{ time_remaining }}s</span>
+        <span class="health-label" style="margin-left:0.5rem;" data-i18n="lbl_current_ip">IP</span>
+        <span class="health-value" id="stat-current-ip">{{ active_ip }}</span>
+    </div>
+</div>
 
-        <div class="dashboard-grid" style="grid-template-columns: 1fr; gap: 1rem;">
-    <!-- ── Upper Section: IPs & Quick Actions ────────────────────────── -->
-    <div style="display: grid; grid-template-columns: 1fr 350px; gap: 1rem;">
+<div class="dashboard-grid" style="display: grid; grid-template-columns: 1fr 340px; gap: 1rem; margin-top: 1rem;">
+    <!-- ── Left Column: Controls & Logs ────────────────────────── -->
+    <div style="display: flex; flex-direction: column; gap: 1rem;">
+        
+        <!-- Compact Relay IPs -->
         <div class="ops-card">
             <div class="ops-card-header">
                 <h3 class="ops-card-title"><span data-i18n="ttl_relay_ips">🔗 Relay IPs</span></h3>
@@ -51,8 +53,8 @@
                     <a href="/ips" class="btn btn-secondary btn-xs" data-i18n="nav_ips">Manage</a>
                 </div>
             </div>
-            <div class="ops-card-body" style="padding: 0;">
-                <table class="ops-table">
+            <div class="ops-card-body" style="padding: 0; max-height: 200px; overflow-y: auto;">
+                <table class="ops-table compact">
                     <thead>
                         <tr>
                             <th data-i18n="col_ip">IP</th>
@@ -78,128 +80,114 @@
                             <td style="text-align: center;">{% if active_ip == ip_cfg.ip %}🟢{% endif %}</td>
                         </tr>
                         {% endfor %}
-                        {% if not all_ips %}
-                        <tr><td colspan="4" style="text-align: center; padding: 2rem; color: var(--text-muted);">No IPs configured. <a href="/ips">Add some now.</a></td></tr>
-                        {% endif %}
                     </tbody>
                 </table>
             </div>
         </div>
 
+        <!-- Activity Feed (Moved UP) -->
         <div class="ops-card">
-            <div class="ops-card-header"><h3 class="ops-card-title" data-i18n="ttl_perf_24h">📊 Performance</h3></div>
-            <div class="ops-card-body" style="padding: 0.5rem; height: 180px;">
+            <div class="ops-card-header">
+                <h3 class="ops-card-title"><span>📡 Activity Feed</span></h3>
+                <div style="display: flex; gap: 1rem; align-items: center;">
+                    <div class="filter-group">
+                        <label class="text-muted small uppercase">Relay:</label>
+                        <select id="filter-ip-top" class="form-input btn-xs" onchange="refreshLogs()">
+                            <option value="">All IPs</option>
+                            {% for uip in unique_ips %}
+                            <option value="{{ uip }}">{{ uip }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button onclick="refreshLogs()" class="btn btn-secondary btn-xs">Refresh</button>
+                </div>
+            </div>
+            <div class="ops-card-body" style="padding: 0; min-height: 500px; overflow-x: auto;">
+                <table class="ops-table" id="logTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 100px; cursor: pointer;" onclick="sortTable(0)">TIME ↕</th>
+                            <th>FROM</th>
+                            <th>TO</th>
+                            <th style="width: 130px; cursor: pointer;" onclick="sortTable(4)">LOCAL IP ↕</th>
+                            <th style="width: 110px; cursor: pointer;" onclick="sortTable(5)">STATUS ↕</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logBody">
+                        {% for log in recent_logs %}
+                        <tr class="log-row" onclick="toggleDetail(this)">
+                            <td class="small">{{ log.time.split(' ')[1] if ' ' in log.time else log.time }}</td>
+                            <td><div class="ellipsis" style="max-width: 180px;" title="{{ log.from }}">{{ log.from }}</div></td>
+                            <td><div class="ellipsis" style="max-width: 180px;" title="{{ log.to }}">{{ log.to }}</div></td>
+                            <td class="small mono">{{ log.local_ip or '—' }}</td>
+                            <td><span class="ops-badge ops-badge-{{ log.status | lower }}">{{ log.status | upper }}</span></td>
+                        </tr>
+                        <tr class="log-detail" style="display: none; background: rgba(0,0,0,0.1);">
+                            <td colspan="5" style="padding: 1.5rem; border-left: 4px solid var(--accent);">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                                    <div>
+                                        <div class="text-muted small uppercase" style="font-weight: 700; margin-bottom: 4px;">Message Context</div>
+                                        <div class="mono small">ID: {{ log.msgid or '—' }}</div>
+                                        <div class="mono small">Queue: {{ log.qid or '—' }}</div>
+                                    </div>
+                                    <div>
+                                        <div class="text-muted small uppercase" style="font-weight: 700; margin-bottom: 4px;">Full Response</div>
+                                        <div class="small" style="line-height: 1.4;">{{ log.response or log.reason or '—' }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Right Column: Sidebar ────────────────────────── -->
+    <div style="display: flex; flex-direction: column; gap: 1rem;">
+        <!-- Performance Chart -->
+        <div class="ops-card">
+            <div class="ops-card-header">
+                <h3 class="ops-card-title"><span>📊 Performance</span></h3>
+            </div>
+            <div class="ops-card-body" style="height: 160px; padding: 0.5rem;">
                 <canvas id="activityChart"></canvas>
             </div>
         </div>
-    </div>
 
-    <!-- ── Stats Section: Top Senders & IPs ────────────────────────── -->
-    <div class="dashboard-grid" style="grid-template-columns: 1fr 2fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+        <!-- Top Senders -->
         <div class="ops-card">
-            <div class="ops-card-header">
-                <h3 class="ops-card-title" style="color: var(--text-primary); font-size: 1.1rem;">Top 10 Senders</h3>
-            </div>
-            <div class="ops-card-body" style="padding: 1rem;">
-                <div style="display: grid; gap: 0.75rem;">
-                    {% for sender, count in top_senders %}
-                    <div style="display: flex; justify-content: space-between; font-size: 1rem; border-bottom: 1px solid var(--border-light); padding-bottom: 0.4rem;">
-                        <span class="ellipsis" style="max-width: 180px; color: var(--text-secondary); font-weight: 500;">{{ sender }}</span>
-                        <span class="mono" style="color: var(--accent); font-weight: 700;">{{ count }}</span>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-        <div class="ops-card">
-            <div class="ops-card-header">
-                <h3 class="ops-card-title" style="color: var(--text-primary); font-size: 1.1rem;">Top Relay IPs</h3>
-            </div>
-            <div class="ops-card-body" style="padding: 1rem;">
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem 2rem;">
-                    {% for ip, count in top_ips %}
-                    <div style="display: flex; justify-content: space-between; font-size: 1rem; border-bottom: 1px solid var(--border-light); padding-bottom: 0.4rem;">
-                        <span style="color: var(--text-secondary); font-weight: 500;">{{ ip }}</span>
-                        <span class="mono" style="color: var(--accent); font-weight: 700;">{{ count }}</span>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ── Lower Section: Unified Log Activity ───────────────────────── -->
-    <div class="ops-card">
-        <div class="ops-card-header" style="padding: 1rem 1.25rem;">
-            <div style="display: flex; align-items: center; gap: 2rem;">
-                <h3 class="ops-card-title" style="color: var(--text-primary); font-size: 1.2rem;">📡 Activity Feed</h3>
-                <div style="display: flex; align-items: center; gap: 0.75rem;">
-                    <span style="color: var(--text-secondary); font-size: 0.9rem; font-weight: 600; text-transform: uppercase;">Relay:</span>
-                    <select class="form-select btn-xs" style="width: 160px;" id="filter-ip-top" onchange="refreshLogs()">
-                        <option value="">ALL IPs</option>
-                        {% for uip in unique_ips %}
-                        <option value="{{ uip }}">{{ uip }}</option>
+            <div class="ops-card-header"><h3 class="ops-card-title">Top 10 Senders</h3></div>
+            <div class="ops-card-body" style="padding: 0;">
+                <table class="ops-table compact">
+                    <tbody>
+                        {% for sender, count in top_senders %}
+                        <tr>
+                            <td><div class="ellipsis" style="max-width: 180px;">{{ sender }}</div></td>
+                            <td class="text-right mono">{{ count }}</td>
+                        </tr>
                         {% endfor %}
-                    </select>
-                </div>
-                <div style="color: var(--text-muted); font-size: 0.95rem;">Showing <strong>{{ recent_logs|length }}</strong> entries</div>
-            </div>
-            <div style="display: flex; gap: 1rem; align-items: center;">
-                <span id="log-status" style="color: var(--text-muted); font-size: 0.85rem;">Last update: Just now</span>
-                <button onclick="refreshLogs()" class="btn btn-primary btn-xs">Refresh Now</button>
+                    </tbody>
+                </table>
             </div>
         </div>
-        <div class="ops-card-body" style="padding: 0; min-height: 600px; overflow-x: auto;">
-            <table class="ops-table" id="logTable">
-                <thead>
-                    <tr>
-                        <th style="width: 120px;">TIME</th>
-                        <th>
-                            <div style="margin-bottom: 6px;">FROM</div>
-                            <input type="text" id="filter-sender" placeholder="Search..." class="form-input btn-xs" onkeyup="debounceRefresh()">
-                        </th>
-                        <th>
-                            <div style="margin-bottom: 6px;">TO</div>
-                            <input type="text" id="filter-recipient" placeholder="Search..." class="form-input btn-xs" onkeyup="debounceRefresh()">
-                        </th>
-                        <th>
-                            <div style="margin-bottom: 6px;">SUBJECT</div>
-                            <input type="text" id="filter-subject" placeholder="Search..." class="form-input btn-xs" onkeyup="debounceRefresh()">
-                        </th>
-                        <th style="width: 140px;">LOCAL IP</th>
-                        <th style="width: 120px;">STATUS</th>
-                    </tr>
-                </thead>
-                <tbody id="logBody">
-                    {% for log in recent_logs %}
-                    <tr class="log-row" onclick="toggleDetail(this)">
-                        <td class="small">{{ log.time }}</td>
-                        <td class="small">127.0.0.1</td> <!-- Placeholder or fetch if available -->
-                        <td><div class="ellipsis" style="max-width: 250px;" title="{{ log.from }}">{{ log.from }}</div></td>
-                        <td><div class="ellipsis" style="max-width: 250px;" title="{{ log.to }}">{{ log.to }}</div></td>
-                        <td><div class="ellipsis" style="max-width: 300px;" title="{{ log.subject }}">{{ log.subject or '—' }}</div></td>
-                        <td class="small">{{ log.local_ip or '—' }}</td>
-                        <td><span class="text-successful" style="color: #22c55e; font-weight: 700;">{{ log.status | upper }}</span></td>
-                    </tr>
-                    <tr class="log-detail" style="display: none; background: #f8fafc;">
-                        <td colspan="7" style="padding: 1rem;">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                                <div>
-                                    <div class="text-muted small uppercase">Message ID</div>
-                                    <div class="mono">{{ log.msgid or '—' }}</div>
-                                    <div class="text-muted small uppercase mt-2">Queue ID</div>
-                                    <div class="mono">{{ log.qid or '—' }}</div>
-                                </div>
-                                <div>
-                                    <div class="text-muted small uppercase">Full Response</div>
-                                    <div class="small">{{ log.response or log.reason or 'No detailed response available.' }}</div>
-                                </div>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+
+        <!-- Top Relay IPs -->
+        <div class="ops-card">
+            <div class="ops-card-header"><h3 class="ops-card-title">Top Relay IPs</h3></div>
+            <div class="ops-card-body" style="padding: 0;">
+                <table class="ops-table compact">
+                    <tbody>
+                        {% for r_ip, count in top_ips %}
+                        <tr>
+                            <td class="mono small">{{ r_ip }}</td>
+                            <td class="text-right mono">{{ count }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>
@@ -208,71 +196,140 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    let logRefreshTimer = null;
+    let remainingTime = parseInt("{{ time_remaining or 0 }}") || 0;
     let isRefreshingLogs = false;
+    let sortConfig = { column: null, direction: 'asc' };
 
-    function debounceRefresh() {
-        clearTimeout(logRefreshTimer);
-        logRefreshTimer = setTimeout(refreshLogs, 500);
+    async function pollStatus() {
+        try {
+            const res = await fetch('/api/status?t=' + Date.now());
+            const data = await res.json();
+            remainingTime = data.time_remaining;
+            document.getElementById('countdown').textContent = remainingTime + 's';
+            if (document.getElementById('stat-current-ip')) document.getElementById('stat-current-ip').textContent = data.active_ip;
+
+            const rows = document.querySelectorAll('#ip-table-body tr');
+            rows.forEach(row => {
+                const ipCell = row.querySelector('td.mono');
+                if (ipCell && row.cells.length >= 4) {
+                    const rowIp = ipCell.textContent.trim();
+                    const activeCell = row.cells[3];
+                    if (rowIp === data.active_ip) { row.classList.add('active-row'); if (activeCell) activeCell.textContent = '🟢'; }
+                    else { row.classList.remove('active-row'); if (activeCell) activeCell.textContent = ''; }
+                }
+            });
+
+            if (document.getElementById('stat-active-ips')) document.getElementById('stat-active-ips').textContent = data.stats.active_ips;
+            if (document.getElementById('stat-blacklisted-ips')) document.getElementById('stat-blacklisted-ips').textContent = data.stats.blacklisted_ips;
+            if (document.getElementById('stat-queue-size')) document.getElementById('stat-queue-size').textContent = data.stats.queue_size;
+            if (document.getElementById('stat-sent-1h')) document.getElementById('stat-sent-1h').textContent = data.total_sent;
+
+            const blVal = document.getElementById('stat-blacklisted-ips');
+            if (blVal) {
+                const blCard = blVal.parentElement;
+                blCard.className = `health-status-card ${data.stats.blacklisted_ips > 0 ? 'crit' : 'good'}`;
+            }
+        } catch(e) { console.error("Poll failed:", e); }
+    }
+
+    async function handleRotate(event) {
+        event.preventDefault();
+        const btn = document.getElementById('rotateBtn');
+        const oldText = btn.textContent;
+        btn.disabled = true; btn.textContent = 'Rotating...'; btn.style.opacity = '0.7';
+
+        try {
+            const res = await fetch('/rotation/trigger', { method: 'POST', headers: { 'Accept': 'application/json' } });
+            const data = await res.json();
+            if (data.success) {
+                remainingTime = data.time_remaining || remainingTime;
+                document.getElementById('countdown').textContent = remainingTime + 's';
+                if (document.getElementById('stat-current-ip')) document.getElementById('stat-current-ip').textContent = data.new_ip;
+                pollStatus();
+            }
+        } catch(e) { console.error("Rotation failed:", e); }
+        finally { btn.disabled = false; btn.textContent = oldText; btn.style.opacity = '1'; }
     }
 
     async function refreshLogs() {
         if (isRefreshingLogs) return;
         isRefreshingLogs = true;
-        
-        const sender = document.getElementById('filter-sender').value;
-        const recipient = document.getElementById('filter-recipient').value;
-        const subject = document.getElementById('filter-subject').value;
         const topIp = document.getElementById('filter-ip-top').value;
-        
         try {
             const params = new URLSearchParams({ limit: 50 });
-            if (sender) params.append('sender', sender);
-            if (recipient) params.append('recipient', recipient);
             if (topIp) params.append('ip', topIp);
-            
             const res = await fetch(`/api/logs?${params.toString()}`);
             const data = await res.json();
-            const body = document.getElementById('logBody');
-            if (!body) return;
-            
-            body.innerHTML = '';
-            data.forEach(log => {
-                if (subject && log.subject && !log.subject.toLowerCase().includes(subject.toLowerCase())) return;
-
-                const statusColor = log.status.toLowerCase() === 'sent' ? '#34d399' : 
-                                  log.status.toLowerCase() === 'deferred' ? '#fbbf24' : '#f87171';
-
-                const row = `
-                    <tr class="log-row" onclick="toggleDetail(this)" style="border-bottom: 1px solid var(--border-light);">
-                        <td style="padding: 0.75rem; color: var(--text-muted); font-size: 0.9rem;">${log.time.split(' ')[1] || log.time}</td>
-                        <td style="padding: 0.75rem;"><div class="ellipsis mono" style="max-width: 250px; color: var(--text-primary); font-weight: 500;" title="${log.from}">${log.from}</div></td>
-                        <td style="padding: 0.75rem;"><div class="ellipsis mono" style="max-width: 250px; color: var(--text-primary); font-weight: 500;" title="${log.to}">${log.to}</div></td>
-                        <td style="padding: 0.75rem;"><div class="ellipsis" style="max-width: 300px; color: var(--text-secondary); font-size: 0.95rem;" title="${log.subject || ''}">${log.subject || '—'}</div></td>
-                        <td style="padding: 0.75rem;" class="mono small color-muted">${log.local_ip || '—'}</td>
-                        <td style="padding: 0.75rem;"><span style="color: ${statusColor}; font-weight: 800; font-size: 0.9rem;">${log.status.toUpperCase()}</span></td>
-                    </tr>
-                    <tr class="log-detail" style="display: none; background: #0f172a;">
-                        <td colspan="6" style="padding: 1.5rem; border-bottom: 3px solid var(--accent);">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
-                                <div>
-                                    <div class="text-muted small uppercase" style="font-weight: 700; margin-bottom: 4px;">Message ID</div>
-                                    <div class="mono small" style="word-break: break-all;">${log.msgid || '—'}</div>
-                                    <div class="text-muted small uppercase" style="font-weight: 700; margin-top: 12px; margin-bottom: 4px;">Queue ID</div>
-                                    <div class="mono small">${log.qid || '—'}</div>
-                                </div>
-                                <div>
-                                    <div class="text-muted small uppercase" style="font-weight: 700; margin-bottom: 4px;">Full Server Response</div>
-                                    <div class="small" style="color: var(--text-secondary); line-height: 1.4;">${log.response || log.reason || '—'}</div>
-                                </div>
-                            </div>
-                        </td>
-                    </tr>`;
-                body.insertAdjacentHTML('beforeend', row);
-            });
-            document.getElementById('log-status').textContent = 'Last update: ' + new Date().toLocaleTimeString();
-        } catch(e) { console.error("Log refresh failed:", e); }
+            renderLogs(data);
+        } catch(e) { console.error("Logs failed:", e); }
         finally { isRefreshingLogs = false; }
+    }
+
+    function renderLogs(data) {
+        const body = document.getElementById('logBody');
+        if (!body) return;
+        body.innerHTML = '';
+        data.forEach(log => {
+            const statusColor = log.status.toLowerCase() === 'sent' ? '#34d399' : 
+                                log.status.toLowerCase() === 'deferred' ? '#fbbf24' : '#f87171';
+            const row = `
+                <tr class="log-row" onclick="toggleDetail(this)">
+                    <td class="small">${log.time.split(' ')[1] || log.time}</td>
+                    <td><div class="ellipsis" style="max-width: 180px;">${log.from}</div></td>
+                    <td><div class="ellipsis" style="max-width: 180px;">${log.to}</div></td>
+                    <td class="small mono">${log.local_ip || '—'}</td>
+                    <td><span class="ops-badge ops-badge-${log.status.toLowerCase()}">${log.status.toUpperCase()}</span></td>
+                </tr>
+                <tr class="log-detail" style="display: none; background: rgba(0,0,0,0.1);">
+                    <td colspan="5" style="padding: 1.5rem; border-left: 4px solid var(--accent);">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                            <div>
+                                <div class="text-muted small uppercase">Message Context</div>
+                                <div class="mono small">ID: ${log.msgid || '—'}</div>
+                                <div class="mono small">Queue: ${log.qid || '—'}</div>
+                            </div>
+                            <div>
+                                <div class="text-muted small uppercase">Response</div>
+                                <div class="small">${log.response || log.reason || '—'}</div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>`;
+            body.insertAdjacentHTML('beforeend', row);
+        });
+    }
+
+    function sortTable(n) {
+        const table = document.getElementById("logTable");
+        let switching = true, shouldSwitch, i;
+        let direction = (sortConfig.column === n && sortConfig.direction === 'asc') ? 'desc' : 'asc';
+        sortConfig = { column: n, direction: direction };
+
+        while (switching) {
+            switching = false;
+            const rows = table.querySelectorAll('tr.log-row');
+            for (i = 0; i < (rows.length - 1); i++) {
+                shouldSwitch = false;
+                let x = rows[i].getElementsByTagName("TD")[n];
+                let y = rows[i + 1].getElementsByTagName("TD")[n];
+                let xVal = x.textContent.toLowerCase();
+                let yVal = y.textContent.toLowerCase();
+
+                if (direction == "asc") {
+                    if (xVal > yVal) { shouldSwitch = true; break; }
+                } else {
+                    if (xVal < yVal) { shouldSwitch = true; break; }
+                }
+            }
+            if (shouldSwitch) {
+                rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                const detail = rows[i+1].nextElementSibling;
+                if (detail && detail.classList.contains('log-detail')) {
+                    rows[i+1].parentNode.insertBefore(detail, rows[i+1].nextElementSibling.nextElementSibling);
+                }
+                switching = true;
+            }
+        }
     }
 
     function toggleDetail(row) {
@@ -282,178 +339,13 @@
         }
     }
 
-    // --- Status Polling ---
-    let remainingTime = parseInt("{{ time_remaining or 0 }}") || 0;
-    async function pollStatus() {
-        try {
-            // Add cache buster
-            const res = await fetch('/api/status?t=' + Date.now());
-            const data = await res.json();
-            
-            remainingTime = data.time_remaining;
-            document.getElementById('countdown').textContent = remainingTime + 's';
-            
-            // Update Current IP Label
-            if (document.getElementById('stat-current-ip')) {
-                document.getElementById('stat-current-ip').textContent = data.active_ip;
-            }
-
-            // Update Table Row Highlighting
-            const rows = document.querySelectorAll('#ip-table-body tr');
-            rows.forEach(row => {
-                const ipCell = row.querySelector('td.mono');
-                if (ipCell && row.cells.length >= 4) {
-                    const rowIp = ipCell.textContent.trim();
-                    const activeCell = row.cells[3];
-                    if (rowIp === data.active_ip) {
-                        row.classList.add('active-row');
-                        if (activeCell) activeCell.textContent = '🟢';
-                    } else {
-                        row.classList.remove('active-row');
-                        if (activeCell) activeCell.textContent = '';
-                    }
-                }
-            });
-
-            // Update Summary Strip
-            if (document.getElementById('stat-postfix')) {
-                const pf = document.getElementById('stat-postfix');
-                pf.textContent = data.postfix_status.toUpperCase();
-                pf.parentElement.className = `health-status-card ${data.postfix_status.toLowerCase() === 'running' ? 'good' : 'crit'}`;
-            }
-            if (document.getElementById('stat-rspamd')) {
-                const rs = document.getElementById('stat-rspamd');
-                rs.textContent = data.rspamd_status.toUpperCase();
-                rs.parentElement.className = `health-status-card ${data.rspamd_status.toLowerCase() === 'running' ? 'good' : 'crit'}`;
-            }
-
-            if (document.getElementById('stat-active-ips')) document.getElementById('stat-active-ips').textContent = data.stats.active_ips;
-            if (document.getElementById('stat-blacklisted-ips')) document.getElementById('stat-blacklisted-ips').textContent = data.stats.blacklisted_ips;
-            if (document.getElementById('stat-queue-size')) document.getElementById('stat-queue-size').textContent = data.stats.queue_size;
-            if (document.getElementById('stat-sent-1h')) document.getElementById('stat-sent-1h').textContent = data.total_sent;
-
-            if (document.getElementById('poll-indicator')) {
-                document.getElementById('poll-indicator').textContent = 'Update: ' + new Date().toLocaleTimeString();
-            }
-
-            const blVal = document.getElementById('stat-blacklisted-ips');
-            if (blVal) {
-                const blCard = blVal.parentElement;
-                blCard.className = `health-status-card ${data.stats.blacklisted_ips > 0 ? 'crit' : 'good'}`;
-            }
-            
-        } catch(e) { console.error("Status poll failed:", e); }
-    }
-
-    async function handleRotate(event) {
-        event.preventDefault();
-        const btn = document.getElementById('rotateBtn');
-        const oldText = btn.textContent;
-        btn.disabled = true;
-        btn.textContent = 'Rotating...';
-        btn.style.opacity = '0.7';
-
-        try {
-            const res = await fetch('/rotation/trigger', { 
-                method: 'POST',
-                headers: { 'Accept': 'application/json' }
-            });
-            const data = await res.json();
-            
-            if (data.success) {
-                // INSTANT UI UPDATE
-                remainingTime = data.time_remaining || remainingTime;
-                document.getElementById('countdown').textContent = remainingTime + 's';
-                
-                if (document.getElementById('stat-current-ip')) {
-                    document.getElementById('stat-current-ip').textContent = data.new_ip;
-                }
-
-                // Update Table Highlighting instantly
-                const rows = document.querySelectorAll('#ip-table-body tr');
-                rows.forEach(row => {
-                    const ipCell = row.querySelector('td.mono');
-                    if (ipCell && row.cells.length >= 4) {
-                        const rowIp = ipCell.textContent.trim();
-                        const activeCell = row.cells[3];
-                        if (rowIp === data.new_ip) {
-                            row.classList.add('active-row');
-                            if (activeCell) activeCell.textContent = '🟢';
-                        } else {
-                            row.classList.remove('active-row');
-                            if (activeCell) activeCell.textContent = '';
-                        }
-                    }
-                });
-            }
-            
-            // Still poll to sync other stats
-            setTimeout(pollStatus, 500); 
-        } catch(e) {
-            console.error("Rotation failed:", e);
-        } finally {
-            btn.disabled = false;
-            btn.textContent = oldText;
-            btn.style.opacity = '1';
-        }
-    }
-
-    setInterval(() => {
-        if (remainingTime > 0) {
-            remainingTime--;
-            document.getElementById('countdown').textContent = remainingTime + 's';
-        }
-    }, 1000);
-
-    setInterval(pollStatus, 1500); 
+    setInterval(() => { if (remainingTime > 0) { remainingTime--; document.getElementById('countdown').textContent = remainingTime + 's'; } }, 1000);
+    setInterval(pollStatus, 1500);
     setInterval(refreshLogs, 10000);
 
-    // --- Chart Initialization ---
     let mailChart = null;
     function initChart() {
         const ctx = document.getElementById('activityChart').getContext('2d');
-        const isLight = document.body.classList.contains('light');
-        const textColor = isLight ? '#475569' : '#94a3b8';
-        const gridColor = isLight ? '#e2e8f0' : '#1e2d4d';
-
-        fetch('/api/chart')
-            .then(res => res.json())
-            .then(data => {
-                mailChart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: data.labels,
-                        datasets: [
-                            {
-                                label: 'Sent',
-                                data: data.datasets.sent,
-                                borderColor: '#06b6d4',
-                                backgroundColor: 'rgba(6, 182, 212, 0.1)',
-                                tension: 0.3,
-                                fill: true,
-                                borderWidth: 2,
-                                pointRadius: 0
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        animation: false,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            x: { display: false },
-                            y: { 
-                                grid: { color: gridColor },
-                                ticks: { color: textColor, font: { size: 9 } }
-                            }
-                        }
-                    }
-                });
-            });
-    }
-
-    // Initial call
     document.addEventListener("DOMContentLoaded", () => {
         initChart();
         refreshLogs();
