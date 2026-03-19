@@ -8,9 +8,75 @@
     <h2 style="color: var(--accent); font-size: 1.1rem; letter-spacing: 0.1em; text-transform: uppercase;" data-i18n="ttl_ips_infra">🌐 Relay IP Infrastructure</h2>
 </div>
 
-<div class="dashboard-grid" style="grid-template-columns: 1fr 350px;">
+<!-- System Insights Compact Bar -->
+<div class="ops-compact-header" style="margin-bottom: 1.5rem; display: flex; gap: 2rem; align-items: center; background: var(--bg-elevated); padding: 0.75rem 1.5rem; border-radius: 6px; border: 1px solid var(--border);">
+    <div style="display: flex; flex-direction: column;">
+        <span data-i18n="lbl_total_managed" style="color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; font-weight: bold; letter-spacing: 0.05em;">Total Managed IPs</span>
+        <span style="font-size: 1.25rem; font-weight: 800; font-family: var(--ff-mono);">{{ ips | length }}</span>
+    </div>
+    <div style="border-left: 1px solid var(--border); padding-left: 2rem; display: flex; flex-direction: column;">
+        <span data-i18n="lbl_active_online" style="color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; font-weight: bold; letter-spacing: 0.05em;">Active (Online)</span>
+        <span class="text-success" style="font-size: 1.25rem; font-weight: 800; font-family: var(--ff-mono); color: var(--green);">{{ (ips | selectattr('enabled') | list | length) }}</span>
+    </div>
+    <div style="border-left: 1px solid var(--border); padding-left: 2rem; display: flex; flex-direction: column;">
+        <span data-i18n="lbl_curr_relay" style="color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; font-weight: bold; letter-spacing: 0.05em;">Current Relay</span>
+        <span class="text-accent mono" style="font-size: 1.25rem; font-weight: 800; color: var(--accent);">{{ active_ip or 'None' }}</span>
+    </div>
+</div>
+
+<!-- Horizontal Provision Form -->
+<div class="ops-card" style="margin-bottom: 1.5rem; border-top: 3px solid var(--accent); background: var(--bg-surface); box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+    <div class="ops-card-header" style="padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border);">
+        <h3 class="ops-card-title" data-i18n="ttl_provision_ip" style="font-size: 0.95rem; margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span>🚀</span> Cấu hình IP Mới (Provision New IP)
+        </h3>
+    </div>
+    <div class="ops-card-body" style="padding: 1.25rem;">
+        <form action="/ips/add" method="post" style="margin: 0;">
+            <!-- Row 1: IPs and Hostname -->
+            <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group" style="margin: 0; flex: 1;">
+                    <label data-i18n="lbl_ip_addr" style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.3rem;">IP Address <span style="color: var(--red);">*</span></label>
+                    <input type="text" name="ip" placeholder="1.2.3.4" class="form-input" required style="width: 100%; border: 1px solid var(--border); background: var(--bg-base); height: 38px; padding: 0 0.75rem;" />
+                </div>
+                <div class="form-group" style="margin: 0; flex: 1.5;">
+                    <label data-i18n="lbl_hostname" style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.3rem;">Hostname / Helo</label>
+                    <input type="text" name="hostname" placeholder="relay.example.com" class="form-input" style="width: 100%; border: 1px solid var(--border); background: var(--bg-base); height: 38px; padding: 0 0.75rem;" />
+                </div>
+            </div>
+            
+            <!-- Row 2: Settings -->
+            <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+                <div class="form-group" style="margin: 0; width: 100px;">
+                    <label data-i18n="lbl_weight" style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.3rem;">Weight</label>
+                    <input type="number" name="weight" value="1" min="1" class="form-input" style="width: 100%; border: 1px solid var(--border); background: var(--bg-base); height: 38px; padding: 0 0.5rem; text-align: center;" />
+                </div>
+                <div class="form-group" style="margin: 0; width: 120px;">
+                    <label data-i18n="lbl_limit_hr" style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.3rem;">Limit / Hour</label>
+                    <input type="number" name="limit_per_hour" value="2000" min="0" class="form-input" style="width: 100%; border: 1px solid var(--border); background: var(--bg-base); height: 38px; padding: 0 0.5rem; text-align: center;" />
+                </div>
+                <div class="form-group" style="margin: 0; flex: 1; min-width: 200px;">
+                    <label data-i18n="lbl_note" style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.3rem;">Operational Note</label>
+                    <input type="text" name="note" placeholder="Location, Provider, etc." class="form-input" style="width: 100%; border: 1px solid var(--border); background: var(--bg-base); height: 38px; padding: 0 0.75rem;" />
+                </div>
+                <div class="form-group" style="margin: 0; padding-bottom: 0.5rem; padding-right: 0.5rem;">
+                    <label class="toggle-label" style="font-size: 0.8rem; cursor: pointer;">
+                        <input type="checkbox" name="warmup_enabled" value="on" class="toggle-input" />
+                        <span class="toggle-track" style="transform: scale(0.9); margin-right: 6px;"><span class="toggle-thumb"></span></span>
+                        <span data-i18n="lbl_warmup" style="color: var(--text-primary); font-weight: 500;">Warm-up</span>
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-primary" style="height: 38px; padding: 0 1.5rem; display: flex; align-items: center; gap: 0.5rem;" data-i18n="btn_provision">
+                    <span>➕</span> Thêm IP / Cấu hình
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="dashboard-grid" style="grid-template-columns: 1fr;">
     
-    <!-- Left Column: IP List -->
+    <!-- Level: IP List -->
     <div class="ops-card">
         <div class="ops-card-header">
             <h3 class="ops-card-title"><span data-i18n="ttl_active_relay">Active Relay IPs</span> <span class="text-muted" style="font-weight: normal; margin-left: 0.5rem;">({{ ips | length }})</span></h3>
@@ -49,42 +115,51 @@
                         <td>
                             <form action="/ips/toggle" method="post">
                                 <input type="hidden" name="ip" value="{{ ip.ip }}" />
-                                <button type="submit" class="badge-btn badge-{% if ip.enabled %}green{% else %}red{% endif %}" style="border: none; cursor: pointer; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.7rem;" data-i18n="status_{% if ip.enabled %}online{% else %}offline{% endif %}">
-                                    {% if ip.enabled %}ONLINE{% else %}OFFLINE{% endif %}
+                                <button type="submit" class="badge-btn" style="border: 1px solid {% if ip.enabled %}rgba(16,217,160,0.5){% else %}rgba(255,100,100,0.5){% endif %}; cursor: pointer; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 0.7rem; background: {% if ip.enabled %}rgba(16,217,160,0.1){% else %}rgba(255,100,100,0.1){% endif %}; color: {% if ip.enabled %}var(--green){% else %}var(--red){% endif %}; box-shadow: 0 0 8px {% if ip.enabled %}rgba(16,217,160,0.15){% else %}rgba(255,100,100,0.15){% endif %};" data-i18n="status_{% if ip.enabled %}online{% else %}offline{% endif %}">
+                                    {% if ip.enabled %}🟢 ONLINE{% else %}🔴 OFFLINE{% endif %}
                                 </button>
                             </form>
                         </td>
                         <td>
                             {% set bl_status = ip.blacklist_status or "NOT CHECKED" %}
                             <div id="bl-container-{{ ip.ip | replace('.', '-') }}">
-                                <span class="badge badge-{% if bl_status == 'CLEAN' %}green{% elif bl_status == 'BLACKLISTED' %}red{% elif 'CACHED' in bl_status %}yellow{% else %}gray{% endif %}" id="status-badge-{{ ip.ip | replace('.', '-') }}" data-i18n="status_{{ bl_status.lower().replace(' ', '_') }}">
+                                <span class="badge" style="padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; border: 1px solid {% if bl_status == 'CLEAN' %}rgba(16,217,160,0.3){% elif bl_status == 'BLACKLISTED' %}rgba(255,100,100,0.3){% elif 'CACHED' in bl_status %}rgba(250,175,0,0.3){% else %}rgba(255,255,255,0.1){% endif %}; background: {% if bl_status == 'CLEAN' %}rgba(16,217,160,0.1){% elif bl_status == 'BLACKLISTED' %}rgba(255,100,100,0.1){% elif 'CACHED' in bl_status %}rgba(250,175,0,0.1){% else %}rgba(255,255,255,0.05){% endif %}; color: {% if bl_status == 'CLEAN' %}var(--green){% elif bl_status == 'BLACKLISTED' %}var(--red){% elif 'CACHED' in bl_status %}var(--yellow){% else %}var(--text-muted){% endif %};" id="status-badge-{{ ip.ip | replace('.', '-') }}" data-i18n="status_{{ bl_status.lower().replace(' ', '_') }}">
                                     {{ bl_status }}
                                 </span>
                             </div>
                         </td>
                         <td>
-                            <div class="text-muted" style="font-size: 0.75rem;">
-                                W: <strong>{{ ip.weight }}</strong> | L: <strong>{{ ip.limit_per_hour }}</strong>/h
-                                {% if ip.note %}<br><span class="ellipsis" style="display:block; max-width: 150px;">{{ ip.note }}</span>{% endif %}
+                            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                <span class="badge badge-gray" style="font-size: 0.65rem; padding: 3px 6px; letter-spacing: 0.05em; background: rgba(255,255,255,0.05); border: 1px solid var(--border);" title="Weight">
+                                    <span style="opacity: 0.5; margin-right: 2px;">⚖️</span> W: <strong style="color: var(--text-primary);">{{ ip.weight }}</strong>
+                                </span>
+                                <span class="badge badge-gray" style="font-size: 0.65rem; padding: 3px 6px; letter-spacing: 0.05em; background: rgba(255,255,255,0.05); border: 1px solid var(--border);" title="Limit per Hour">
+                                    <span style="opacity: 0.5; margin-right: 2px;">⏱️</span> L: <strong style="color: var(--text-primary);">{{ ip.limit_per_hour }}</strong>/h
+                                </span>
                             </div>
+                            {% if ip.note %}
+                            <div class="text-muted" style="font-size: 0.75rem; margin-top: 6px; display: flex; align-items: center; gap: 4px;">
+                                <span style="opacity: 0.5; font-size: 0.7rem;">📝</span> <span class="ellipsis" style="max-width: 180px;" title="{{ ip.note }}">{{ ip.note }}</span>
+                            </div>
+                            {% endif %}
                         </td>
                         <td style="text-align: right;">
-                            <div style="display: flex; gap: 0.4rem; justify-content: flex-end;">
-                                <button class="btn btn-secondary btn-xs" 
+                            <div style="display: flex; gap: 0.4rem; justify-content: flex-end; opacity: 0.8; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">
+                                <button class="btn btn-secondary btn-xs" style="padding: 4px 8px; border-radius: 4px; background: rgba(255,255,255,0.05); border: 1px solid transparent;"
                                     data-ip="{{ ip.ip }}" data-hostname="{{ ip.hostname | default('') | e }}" data-weight="{{ ip.weight }}"
                                     data-limit="{{ ip.limit_per_hour }}" data-note="{{ ip.note | e }}"
                                     data-smtp-user="{{ ip.smtp_user | default('') | e }}" data-smtp-pass="{{ ip.smtp_pass | default('') | e }}"
                                     data-enabled="{{ ip.enabled | lower }}" 
                                     data-warmup-enabled="{{ ip.warmup_enabled | lower }}"
                                     data-warmup-start="{{ ip.warmup_start_date | default('') }}"
-                                    onclick="openEditFromBtn(this)" title="Edit Config" data-i18n="[title]ttl_edit_config"><span class="icon">⚙</span></button>
+                                    onclick="openEditFromBtn(this)" title="Edit Config" data-i18n="[title]ttl_edit_config"><span class="icon" style="font-size: 0.9rem;">⚙️</span></button>
                                 
-                                <button type="button" class="btn btn-secondary btn-xs" onclick="checkBlacklist('{{ ip.ip }}', true)" title="Check Blacklist" data-i18n="[title]ttl_check_bl">🛡</button>
+                                <button type="button" class="btn btn-secondary btn-xs" style="padding: 4px 8px; border-radius: 4px; background: rgba(255,255,255,0.05); border: 1px solid transparent;" onclick="checkBlacklist('{{ ip.ip }}', true)" title="Check Blacklist" data-i18n="[title]ttl_check_bl">🛡️</button>
                                 
                                 {% if ip.ip != active_ip %}
                                 <form action="/ips/delete" method="post" onsubmit="return confirmDelete()">
                                     <input type="hidden" name="ip" value="{{ ip.ip }}" />
-                                    <button type="submit" class="btn btn-secondary btn-xs text-danger" title="Remove IP">✕</button>
+                                    <button type="submit" class="btn btn-secondary btn-xs text-danger" style="padding: 4px 8px; border-radius: 4px; background: rgba(255,100,100,0.1); border: 1px solid transparent; color: var(--red);" title="Remove IP" onmouseover="this.style.background='var(--red)'; this.style.color='#fff';" onmouseout="this.style.background='rgba(255,100,100,0.1)'; this.style.color='var(--red)';">✕</button>
                                 </form>
                                 {% endif %}
                             </div>
@@ -101,62 +176,7 @@
         </div>
     </div>
 
-    <!-- Right Column: Add IP Form -->
-    <div style="display: flex; flex-direction: column; gap: 1.5rem; position: sticky; top: calc(var(--nav-h) + 2rem);">
-        <div class="ops-card" style="border-top: 4px solid var(--accent);">
-            <div class="ops-card-header">
-                <h3 class="ops-card-title" data-i18n="ttl_provision_ip">Provision New IP</h3>
-            </div>
-            <div class="ops-card-body">
-                <form action="/ips/add" method="post">
-                    <div class="form-group">
-                        <label data-i18n="lbl_ip_addr">IP Address</label>
-                        <input type="text" name="ip" placeholder="1.2.3.4" class="form-input" required />
-                    </div>
-                    <div class="form-group">
-                        <label data-i18n="lbl_hostname">Hostname / Helo</label>
-                        <input type="text" name="hostname" placeholder="relay.example.com" class="form-input" />
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label data-i18n="lbl_weight">Weight</label>
-                            <input type="number" name="weight" value="1" min="1" class="form-input" />
-                        </div>
-                        <div class="form-group">
-                            <label data-i18n="lbl_limit_hr">Limit / Hour</label>
-                            <input type="number" name="limit_per_hour" value="2000" min="0" class="form-input" />
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label data-i18n="lbl_note">Operational Note</label>
-                        <input type="text" name="note" placeholder="Location, Provider, etc." class="form-input" />
-                    </div>
-                    <div class="form-group">
-                        <label class="toggle-label">
-                            <input type="checkbox" name="warmup_enabled" value="on" class="toggle-input" />
-                            <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                            <span data-i18n="lbl_warmup">Enable Warm-up Schedule</span>
-                        </label>
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-full btn-lg" style="margin-top: 1rem;" data-i18n="btn_provision">🚀 Provision IP</button>
-                </form>
-            </div>
-        </div>
-        
-        <div class="ops-card">
-            <div class="ops-card-header">
-                <h3 class="ops-card-title" data-i18n="ttl_insights">System Insights</h3>
-            </div>
-            <div class="ops-card-body" style="font-size: 0.85rem; color: var(--text-secondary);">
-                <ul>
-                    <li>• <span data-i18n="lbl_total_managed">Total Managed IPs</span>: {{ ips | length }}</li>
-                    <li>• <span data-i18n="lbl_active_online">Active (Online)</span>: <span class="text-success">{{ (ips | selectattr('enabled') | list | length) }}</span></li>
-                    <li>• <span data-i18n="lbl_curr_relay">Current Relay</span>: <span class="text-accent">{{ active_ip or 'None' }}</span></li>
-                </ul>
-            </div>
-        </div>
-    </div>
-</div>
+
 
 <!-- Edit Modal -->
 <div id="editModal" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(4px);">

@@ -5,204 +5,146 @@
 
 {% block content %}
 <!-- ── Operations Header Strip ──────────────────────────────────────── -->
-<div class="ops-health-bar" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));">
-    <div class="health-status-card {% if postfix_status == 'running' %}good{% else %}crit{% endif %}">
-        <span class="health-label" data-i18n="lbl_postfix">System: Postfix</span>
-        <span class="health-value" id="stat-postfix">{{ postfix_status | upper }}</span>
+<!-- ── Operations Header Strip (Ultra Compact) ──────────────────────────────────────── -->
+<div class="ops-compact-header">
+    <div class="stat-item {% if postfix_status == 'running' %}good{% else %}crit{% endif %}">
+        <span class="lbl" data-i18n="lbl_postfix">Hệ thống: Postfix</span>
+        <span class="val" id="stat-postfix">{{ postfix_status | upper }}</span>
     </div>
-    <div class="health-status-card {% if rspamd_status == 'running' %}good{% else %}crit{% endif %}">
-        <span class="health-label" data-i18n="lbl_rspamd">System: Rspamd</span>
-        <span class="health-value" id="stat-rspamd">{{ rspamd_status | upper }}</span>
+    <div class="stat-item {% if rspamd_status == 'running' %}good{% else %}crit{% endif %}">
+        <span class="lbl" data-i18n="lbl_rspamd">Hệ thống: Rspamd</span>
+        <span class="val" id="stat-rspamd">{{ rspamd_status | upper }}</span>
     </div>
-    <div class="health-status-card good">
-        <span class="health-label" data-i18n="lbl_active_ips">Active IPs</span>
-        <span class="health-value" id="stat-active-ips">{{ stats.active_ips }}</span>
+    <div class="stat-item good">
+        <span class="lbl" data-i18n="lbl_active_ips">Active IPs</span>
+        <span class="val" id="stat-active-ips">{{ stats.active_ips }}</span>
     </div>
-    <div class="health-status-card {% if stats.blacklisted_ips > 0 %}crit{% else %}good{% endif %}">
-        <span class="health-label" data-i18n="lbl_blacklisted_ips">Blacklisted</span>
-        <span class="health-value" id="stat-blacklisted-ips">{{ stats.blacklisted_ips }}</span>
+    <div class="stat-item {% if stats.blacklisted_ips > 0 %}crit{% else %}good{% endif %}">
+        <span class="lbl" data-i18n="lbl_blacklisted_ips">Blacklisted</span>
+        <span class="val" id="stat-blacklisted-ips">{{ stats.blacklisted_ips }}</span>
     </div>
-    <div class="health-status-card good">
-        <span class="health-label" data-i18n="lbl_queue_size">Queue Size</span>
-        <span class="health-value" id="stat-queue-size">{{ stats.queue_size }}</span>
+    <div class="stat-item good">
+        <span class="lbl" data-i18n="lbl_queue_size">Queue Size</span>
+        <span class="val" id="stat-queue-size">{{ stats.queue_size }}</span>
     </div>
-    <div class="health-status-card good">
-        <span class="health-label" data-i18n="lbl_sent_1h">Sent (1h)</span>
-        <span class="health-value" id="stat-sent-1h">{{ stats.total_sent_1h }}</span>
+    <div class="stat-item good">
+        <span class="lbl" data-i18n="lbl_sent_1h">Sent (1h)</span>
+        <span class="val" id="stat-sent-1h">{{ stats.total_sent_1h }}</span>
     </div>
-    <div class="health-status-card good">
-        <span class="health-label" data-i18n="lbl_rot_trigger">Rotation</span>
-        <span class="health-value" id="countdown">{{ time_remaining }}s</span>
-        <span class="health-label" style="margin-left:0.5rem;" data-i18n="lbl_current_ip">IP</span>
-        <span class="health-value" id="stat-current-ip">{{ active_ip }}</span>
+    <div class="stat-item good">
+        <span class="lbl" data-i18n="lbl_rot_trigger">Xoay IP: Đếm ngược</span>
+        <span class="val" id="countdown">{{ time_remaining }}s</span>
+    </div>
+    
+    <div class="stat-actions" style="margin-left: auto; display: flex; gap: 0.5rem; align-items: center;">
+        <span class="lbl" style="font-size: 0.75rem; color: var(--text-muted);">IP H/T:</span>
+        <span class="val mono" id="stat-current-ip" style="font-weight: 700;">{{ active_ip }}</span>
+        <form onsubmit="handleRotate(event)" style="display: inline; margin-left: 0.5rem;">
+            <button type="submit" id="rotateBtn" class="btn btn-primary btn-xs" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">⟳ Rotate</button>
+        </form>
     </div>
 </div>
 
-<div class="dashboard-grid" style="display: grid; grid-template-columns: 1fr 340px; gap: 1rem; margin-top: 1rem;">
-    <!-- ── Left Column: Controls & Logs ────────────────────────── -->
-    <div style="display: flex; flex-direction: column; gap: 1rem;">
-        
-        <!-- Compact Relay IPs -->
-        <div class="ops-card">
-            <div class="ops-card-header">
-                <h3 class="ops-card-title"><span data-i18n="ttl_relay_ips">🔗 Relay IPs</span></h3>
-                <div style="display: flex; gap: 0.5rem;">
-                    <form onsubmit="handleRotate(event)" style="display: inline;">
-                        <button type="submit" id="rotateBtn" class="btn btn-primary btn-xs">⟳ Force Rotate</button>
-                    </form>
-                    <a href="/ips" class="btn btn-secondary btn-xs" data-i18n="nav_ips">Manage</a>
-                </div>
-            </div>
-            <div class="ops-card-body" style="padding: 0; max-height: 200px; overflow-y: auto;">
-                <table class="ops-table compact">
-                    <thead>
-                        <tr>
-                            <th data-i18n="col_ip">IP / Hostname</th>
-                            <th data-i18n="col_status">Relay</th>
-                            <th>Blacklist</th>
-                            <th>Details</th>
-                            <th data-i18n="col_sent">Sent</th>
-                            <th data-i18n="col_active">Act</th>
-                        </tr>
-                    </thead>
-                    <tbody id="ip-table-body">
-                        {% for ip_cfg in all_ips %}
-                        <tr class="{% if active_ip == ip_cfg.ip %}active-row{% endif %}">
-                            <td class="mono" style="padding: 0.5rem 0.75rem;">
-                                <div style="font-weight: 700;">{{ ip_cfg.ip }}</div>
-                                {% if ip_cfg.hostname %}<div style="font-size: 0.7rem; color: var(--text-muted); opacity: 0.8;">{{ ip_cfg.hostname }}</div>{% endif %}
-                            </td>
-                            <td style="padding: 0.5rem 0.75rem;">
-                                {% if not ip_cfg.enabled %}
-                                <span class="badge badge-gray" style="font-size: 0.65rem;">OFFLINE</span>
-                                {% else %}
-                                <span class="badge badge-green" style="font-size: 0.65rem;">ONLINE</span>
-                                {% endif %}
-                            </td>
-                            <td style="padding: 0.5rem 0.75rem;">
-                                {% set bl = ip_cfg.blacklist_status or 'CLEAN' %}
-                                <span class="badge badge-{% if bl == 'CLEAN' %}green{% elif bl == 'BLACKLISTED' %}red{% else %}yellow{% endif %}" style="font-size: 0.65rem;">
-                                    {{ bl }}
-                                </span>
-                            </td>
-                            <td style="padding: 0.5rem 0.75rem; font-size: 0.7rem; line-height: 1.2; color: var(--text-muted);">
-                                <div>W:{{ ip_cfg.weight }} | L:{{ ip_cfg.limit_per_hour }}</div>
-                                {% if ip_cfg.note %}<div class="ellipsis" style="max-width: 100px;">{{ ip_cfg.note }}</div>{% endif %}
-                            </td>
-                            <td class="mono" style="padding: 0.5rem 0.75rem;"><strong>{{ counters.get(ip_cfg.ip, {}).get("count", 0) }}</strong></td>
-                            <td style="text-align: center; padding: 0.5rem 0.75rem;">{% if active_ip == ip_cfg.ip %}🟢{% endif %}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Activity Feed (Moved UP) -->
-        <div class="ops-card">
-            <div class="ops-card-header">
-                <h3 class="ops-card-title"><span>📡 Activity Feed</span></h3>
-                <div style="display: flex; gap: 1rem; align-items: center;">
-                    <div class="filter-group">
-                        <label class="text-muted small uppercase">Relay:</label>
-                        <select id="filter-ip-top" class="form-input btn-xs" onchange="refreshLogs()">
-                            <option value="">All IPs</option>
-                            {% for uip in unique_ips %}
-                            <option value="{{ uip }}">{{ uip }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <button onclick="refreshLogs()" class="btn btn-secondary btn-xs">Refresh</button>
-                </div>
-            </div>
-            <div class="ops-card-body" style="padding: 0; min-height: 500px; overflow-x: auto;">
-                <table class="ops-table" id="logTable">
-                    <thead>
-                        <tr>
-                            <th style="width: 100px; cursor: pointer;" onclick="sortTable(0)">TIME ↕</th>
-                            <th>FROM</th>
-                            <th>TO</th>
-                            <th style="width: 130px; cursor: pointer;" onclick="sortTable(4)">LOCAL IP ↕</th>
-                            <th style="width: 110px; cursor: pointer;" onclick="sortTable(5)">STATUS ↕</th>
-                        </tr>
-                    </thead>
-                    <tbody id="logBody">
-                        {% for log in recent_logs %}
-                        <tr class="log-row" onclick="toggleDetail(this)">
-                            <td class="small">{{ log.time.split(' ')[1] if ' ' in log.time else log.time }}</td>
-                            <td><div class="ellipsis" style="max-width: 180px;" title="{{ log.from }}">{{ log.from }}</div></td>
-                            <td><div class="ellipsis" style="max-width: 180px;" title="{{ log.to }}">{{ log.to }}</div></td>
-                            <td class="small mono">{{ log.local_ip or '—' }}</td>
-                            <td><span class="ops-badge ops-badge-{{ log.status | lower }}">{{ log.status | upper }}</span></td>
-                        </tr>
-                        <tr class="log-detail" style="display: none; background: rgba(0,0,0,0.1);">
-                            <td colspan="5" style="padding: 1.5rem; border-left: 4px solid var(--accent);">
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
-                                    <div>
-                                        <div class="text-muted small uppercase" style="font-weight: 700; margin-bottom: 4px;">Message Context</div>
-                                        <div class="mono small">ID: {{ log.msgid or '—' }}</div>
-                                        <div class="mono small">Queue: {{ log.qid or '—' }}</div>
-                                    </div>
-                                    <div>
-                                        <div class="text-muted small uppercase" style="font-weight: 700; margin-bottom: 4px;">Full Response</div>
-                                        <div class="small" style="line-height: 1.4;">{{ log.response or log.reason or '—' }}</div>
-                                    </div>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+<!-- ── Compact Top Analytics ────────────────────────── -->
+<div class="dashboard-grid mt-3 mb-0" style="margin-top: 0.5rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+    <!-- Top Senders -->
+    <div class="ops-card mb-0" style="border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <div class="ops-card-header compact-header" style="padding: 0.35rem 0.85rem !important; border-bottom: 1px solid var(--border);"><h3 class="ops-card-title" style="font-size: 0.8rem; text-transform: uppercase;">🔥 Top 10 Senders</h3></div>
+        <div class="ops-card-body" style="padding: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.4rem;">
+            {% for sender, count in top_senders %}
+            <span style="background: var(--bg-elevated); border: 1px solid var(--border); padding: 0.15rem 0.45rem; border-radius: 4px; font-size: 0.8rem; display: flex; align-items: center; gap: 0.3rem;">
+                <span class="addr-text ellipsis" style="max-width: 180px;" title="{{ sender }}">{{ sender }}</span>
+                <span class="text-blue bold" style="font-family: var(--ff-mono);">[{{ count }}]</span>
+            </span>
+            {% else %}
+            <span style="color: var(--text-muted); font-size: 0.8rem; font-style: italic;">Không có dữ liệu</span>
+            {% endfor %}
         </div>
     </div>
 
-    <!-- ── Right Column: Sidebar ────────────────────────── -->
-    <div style="display: flex; flex-direction: column; gap: 1rem;">
-        <!-- Performance Chart -->
-        <div class="ops-card">
-            <div class="ops-card-header">
-                <h3 class="ops-card-title"><span>📊 Performance</span></h3>
-            </div>
-            <div class="ops-card-body" style="height: 160px; padding: 0.5rem;">
-                <canvas id="activityChart"></canvas>
-            </div>
-        </div>
-
-        <!-- Top Senders -->
-        <div class="ops-card">
-            <div class="ops-card-header"><h3 class="ops-card-title">Top 10 Senders</h3></div>
-            <div class="ops-card-body" style="padding: 0;">
-                <table class="ops-table compact">
-                    <tbody>
-                        {% for sender, count in top_senders %}
-                        <tr>
-                            <td><div class="ellipsis" style="max-width: 180px;">{{ sender }}</div></td>
-                            <td class="text-right mono">{{ count }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Top Relay IPs -->
-        <div class="ops-card">
-            <div class="ops-card-header"><h3 class="ops-card-title">Top Relay IPs</h3></div>
-            <div class="ops-card-body" style="padding: 0;">
-                <table class="ops-table compact">
-                    <tbody>
-                        {% for r_ip, count in top_ips %}
-                        <tr>
-                            <td class="mono small">{{ r_ip }}</td>
-                            <td class="text-right mono">{{ count }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+    <!-- Top IPs -->
+    <div class="ops-card mb-0" style="border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <div class="ops-card-header compact-header" style="padding: 0.35rem 0.85rem !important; border-bottom: 1px solid var(--border);"><h3 class="ops-card-title" style="font-size: 0.8rem; text-transform: uppercase;">🔥 Top Relay IPs</h3></div>
+        <div class="ops-card-body" style="padding: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.4rem;">
+            {% for r_ip, count in top_ips %}
+            <span style="background: var(--bg-elevated); border: 1px solid var(--border); padding: 0.15rem 0.45rem; border-radius: 4px; font-size: 0.8rem; display: flex; align-items: center; gap: 0.3rem;">
+                <span class="mono addr-text">{{ r_ip }}</span>
+                <span class="text-blue bold" style="font-family: var(--ff-mono);">[{{ count }}]</span>
+            </span>
+            {% else %}
+            <span style="color: var(--text-muted); font-size: 0.8rem; font-style: italic;">Không có dữ liệu</span>
+            {% endfor %}
         </div>
     </div>
+</div>
+
+<!-- ── Main Area: Activity Feed ────────────────────────── -->
+<div class="ops-card mt-3 mb-0" style="border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+    <div class="ops-card-header" style="padding: 0.5rem 1rem; background: var(--bg-elevated); border-bottom: 2px solid var(--border);">
+        <h3 class="ops-card-title" style="font-size: 0.95rem; text-transform: uppercase;"><span>📡 Activity Feed</span></h3>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <div class="filter-group">
+                <select id="filter-ip-top" class="form-input btn-xs" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; height: auto;" onchange="refreshLogs()">
+                    <option value="">-- TẤT CẢ IP --</option>
+                    {% for uip in unique_ips %}
+                    <option value="{{ uip }}">{{ uip }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button onclick="refreshLogs()" class="btn btn-secondary btn-xs" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; height: auto;">↻ Cập nhật</button>
+        </div>
+    </div>
+    <div class="ops-card-body" style="padding: 0; height: 60vh; overflow-y: auto;">
+        <table class="ops-table log-table" id="logTable">
+            <thead style="position: sticky; top: 0; z-index: 10;">
+                <tr>
+                    <th style="width: 140px; cursor: pointer;" onclick="sortTable(0)">TIME ↕</th>
+                    <th style="width: 130px; cursor: pointer;" onclick="sortTable(1)">LOCAL IP ↕</th>
+                    <th style="width: 200px;">FROM</th>
+                    <th style="width: 200px;">TO</th>
+                    <th>SUBJECT</th>
+                    <th style="width: 110px; cursor: pointer;" onclick="sortTable(5)">STATUS ↕</th>
+                </tr>
+                <tr class="inline-filter-row">
+                    <td></td>
+                    <td><input type="text" id="fltLocal" placeholder="Filter IP" onkeyup="filterTableInline()"></td>
+                    <td><input type="text" id="fltFrom" placeholder="Filter From" onkeyup="filterTableInline()"></td>
+                    <td><input type="text" id="fltTo" placeholder="Filter To" onkeyup="filterTableInline()"></td>
+                    <td><input type="text" id="fltSubject" placeholder="Filter Subject" onkeyup="filterTableInline()"></td>
+                    <td></td>
+                </tr>
+            </thead>
+            <tbody id="logBody">
+                {% for log in recent_logs %}
+                {% set status_lower = log.status | lower %}
+                <tr class="log-row" onclick="toggleDetail(this)">
+                    <td class="small">{{ log.time }}</td>
+                    <td class="small mono">{{ log.local_ip or '—' }}</td>
+                    <td class="addr-cell"><div class="ellipsis">{{ log.from }}</div></td>
+                    <td class="addr-cell"><div class="ellipsis">{{ log.to }}</div></td>
+                    <td class="addr-cell"><div class="ellipsis">{{ log.subject or '—' }}</div></td>
+                    <td><span class="ops-badge ops-badge-{% if status_lower == 'sent' %}successful{% else %}{{ status_lower }}{% endif %}">{{ 'SUCCESSFUL' if status_lower == 'sent' else (log.status | upper) }}</span></td>
+                </tr>
+                <tr class="log-detail" style="display: none; background: rgba(0,0,0,0.1);">
+                    <td colspan="6" style="padding: 1rem; border-left: 3px solid var(--accent);">
+                        <div style="display: flex; gap: 2rem;">
+                            <div style="min-width: 200px;">
+                                <div class="text-muted small uppercase" style="font-weight: 700;">Context</div>
+                                <div class="mono small">ID: {{ log.msgid or '—' }}</div>
+                                <div class="mono small">QID: {{ log.qid or '—' }}</div>
+                            </div>
+                            <div style="flex: 1;">
+                                <div class="text-muted small uppercase" style="font-weight: 700;">Response</div>
+                                <div class="small" style="line-height: 1.2;">{{ log.response or log.reason or '—' }}</div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
 </div>
 {% endblock %}
 
@@ -217,30 +159,32 @@
         try {
             const res = await fetch('/api/status?t=' + Date.now());
             const data = await res.json();
-            remainingTime = data.time_remaining;
-            document.getElementById('countdown').textContent = remainingTime + 's';
-            if (document.getElementById('stat-current-ip')) document.getElementById('stat-current-ip').textContent = data.active_ip;
+            if (data) {
+                remainingTime = data.time_remaining !== undefined ? data.time_remaining : remainingTime;
+                document.getElementById('countdown').textContent = remainingTime + 's';
+                
+                const ipLabel = document.getElementById('stat-current-ip');
+                if (ipLabel) ipLabel.textContent = data.active_ip || '—';
 
-            const rows = document.querySelectorAll('#ip-table-body tr');
-            rows.forEach(row => {
-                const ipCell = row.querySelector('td.mono');
-                if (ipCell && row.cells.length >= 4) {
-                    const rowIp = ipCell.textContent.trim();
-                    const activeCell = row.cells[3];
-                    if (rowIp === data.active_ip) { row.classList.add('active-row'); if (activeCell) activeCell.textContent = '🟢'; }
-                    else { row.classList.remove('active-row'); if (activeCell) activeCell.textContent = ''; }
+                const rows = document.querySelectorAll('#ip-table-body tr');
+                rows.forEach(row => {
+                    const ipCell = row.querySelector('td.mono');
+                    if (ipCell && row.cells.length >= 3) {
+                        const rowIp = ipCell.textContent.trim();
+                        if (rowIp === data.active_ip) { row.classList.add('active-row'); }
+                        else { row.classList.remove('active-row'); }
+                    }
+                });
+
+                if (document.getElementById('stat-active-ips')) document.getElementById('stat-active-ips').textContent = data.stats?.active_ips || 0;
+                if (document.getElementById('stat-blacklisted-ips')) document.getElementById('stat-blacklisted-ips').textContent = data.stats?.blacklisted_ips || 0;
+                if (document.getElementById('stat-queue-size')) document.getElementById('stat-queue-size').textContent = data.stats?.queue_size || 0;
+                if (document.getElementById('stat-sent-1h')) document.getElementById('stat-sent-1h').textContent = data.total_sent || 0;
+
+                const blVal = document.getElementById('stat-blacklisted-ips');
+                if (blVal && blVal.parentElement) {
+                    blVal.parentElement.className = `stat-item ${(data.stats?.blacklisted_ips > 0) ? 'crit' : 'good'}`;
                 }
-            });
-
-            if (document.getElementById('stat-active-ips')) document.getElementById('stat-active-ips').textContent = data.stats.active_ips;
-            if (document.getElementById('stat-blacklisted-ips')) document.getElementById('stat-blacklisted-ips').textContent = data.stats.blacklisted_ips;
-            if (document.getElementById('stat-queue-size')) document.getElementById('stat-queue-size').textContent = data.stats.queue_size;
-            if (document.getElementById('stat-sent-1h')) document.getElementById('stat-sent-1h').textContent = data.total_sent;
-
-            const blVal = document.getElementById('stat-blacklisted-ips');
-            if (blVal) {
-                const blCard = blVal.parentElement;
-                blCard.className = `health-status-card ${data.stats.blacklisted_ips > 0 ? 'crit' : 'good'}`;
             }
         } catch(e) { console.error("Poll failed:", e); }
     }
@@ -283,33 +227,36 @@
         if (!body) return;
         body.innerHTML = '';
         data.forEach(log => {
-            const statusColor = log.status.toLowerCase() === 'sent' ? '#34d399' : 
-                                log.status.toLowerCase() === 'deferred' ? '#fbbf24' : '#f87171';
+            const stLow = log.status.toLowerCase();
+            const badgeCls = stLow === 'sent' ? 'successful' : stLow;
+            const badgeTxt = stLow === 'sent' ? 'SUCCESSFUL' : log.status.toUpperCase();
             const row = `
                 <tr class="log-row" onclick="toggleDetail(this)">
-                    <td class="small">${log.time.split(' ')[1] || log.time}</td>
-                    <td><div class="ellipsis" style="max-width: 180px;">${log.from}</div></td>
-                    <td><div class="ellipsis" style="max-width: 180px;">${log.to}</div></td>
+                    <td class="small">${log.time}</td>
                     <td class="small mono">${log.local_ip || '—'}</td>
-                    <td><span class="ops-badge ops-badge-${log.status.toLowerCase()}">${log.status.toUpperCase()}</span></td>
+                    <td class="addr-cell"><div class="ellipsis">${log.from}</div></td>
+                    <td class="addr-cell"><div class="ellipsis">${log.to}</div></td>
+                    <td class="addr-cell"><div class="ellipsis">${log.subject || '—'}</div></td>
+                    <td><span class="ops-badge ops-badge-${badgeCls}">${badgeTxt}</span></td>
                 </tr>
                 <tr class="log-detail" style="display: none; background: rgba(0,0,0,0.1);">
-                    <td colspan="5" style="padding: 1.5rem; border-left: 4px solid var(--accent);">
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
-                            <div>
-                                <div class="text-muted small uppercase">Message Context</div>
+                    <td colspan="6" style="padding: 1rem; border-left: 3px solid var(--accent);">
+                        <div style="display: flex; gap: 2rem;">
+                            <div style="min-width: 200px;">
+                                <div class="text-muted small uppercase" style="font-weight: 700;">Context</div>
                                 <div class="mono small">ID: ${log.msgid || '—'}</div>
-                                <div class="mono small">Queue: ${log.qid || '—'}</div>
+                                <div class="mono small">QID: ${log.qid || '—'}</div>
                             </div>
-                            <div>
-                                <div class="text-muted small uppercase">Response</div>
-                                <div class="small">${log.response || log.reason || '—'}</div>
+                            <div style="flex: 1;">
+                                <div class="text-muted small uppercase" style="font-weight: 700;">Response</div>
+                                <div class="small" style="line-height: 1.2;">${log.response || log.reason || '—'}</div>
                             </div>
                         </div>
                     </td>
                 </tr>`;
             body.insertAdjacentHTML('beforeend', row);
         });
+        filterTableInline(); // Re-apply filter if user typing
     }
 
     function sortTable(n) {
@@ -352,23 +299,104 @@
         }
     }
 
+    function filterTableInline() {
+        const fltLocal = document.getElementById('fltLocal') ? document.getElementById('fltLocal').value.toLowerCase().trim() : '';
+        const fltFrom = document.getElementById('fltFrom') ? document.getElementById('fltFrom').value.toLowerCase().trim() : '';
+        const fltTo = document.getElementById('fltTo') ? document.getElementById('fltTo').value.toLowerCase().trim() : '';
+        const fltSubject = document.getElementById('fltSubject') ? document.getElementById('fltSubject').value.toLowerCase().trim() : '';
+        
+        const rows = document.querySelectorAll('#logBody .log-row');
+        rows.forEach(row => {
+            const rowLocal = row.cells[1].textContent.toLowerCase();
+            const rowFrom = row.cells[2].textContent.toLowerCase();
+            const rowTo = row.cells[3].textContent.toLowerCase();
+            const rowSubject = row.cells[4].textContent.toLowerCase();
+            const detail = row.nextElementSibling;
+            
+            if (rowLocal.includes(fltLocal) && rowFrom.includes(fltFrom) && rowTo.includes(fltTo) && rowSubject.includes(fltSubject)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+                if (detail && detail.classList.contains('log-detail')) detail.style.display = 'none';
+            }
+        });
+    }
+
     setInterval(() => { if (remainingTime > 0) { remainingTime--; document.getElementById('countdown').textContent = remainingTime + 's'; } }, 1000);
     setInterval(pollStatus, 1500);
     setInterval(refreshLogs, 10000);
 
-    let mailChart = null;
-    function initChart() {
-        const ctx = document.getElementById('activityChart').getContext('2d');
     document.addEventListener("DOMContentLoaded", () => {
-        initChart();
         refreshLogs();
         pollStatus();
     });
 </script>
 <style>
+    /* ── Local Compact Dashboard Overrides ── */
+    .ops-compact-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      background: var(--bg-elevated);
+      padding: 0.5rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      margin: -1rem -1.5rem 1rem -1.5rem;
+    }
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding-right: 1.25rem;
+      margin-right: 1.25rem;
+      border-right: 1px solid var(--border);
+    }
+    .stat-item:last-of-type { border-right: none; padding-right: 0; margin-right: 0; }
+    .stat-item .lbl { color: var(--text-muted); text-transform: uppercase; font-weight: 700; font-size: 0.7rem; letter-spacing: 0.05em; }
+    .stat-item .val { font-weight: 800; font-family: var(--ff-mono); font-size: 0.95rem; }
+    .stat-item.good .val { color: var(--green); }
+    .stat-item.crit .val { color: var(--red); }
+    .mt-3 { margin-top: 1rem; }
+    .mb-0 { margin-bottom: 0 !important; }
+
+    /* Log Table matching image */
+    .log-table { background: var(--bg-surface); border: 1px solid var(--border); }
+    .log-table th { padding: 0.45rem 0.6rem !important; font-size: 0.85rem !important; background: var(--bg-elevated) !important; text-transform: uppercase; letter-spacing: 0px !important; }
+    .log-table td { padding: 0.45rem 0.6rem !important; font-size: 0.95rem; border-bottom: 1px solid var(--border) !important; color: var(--text-primary) !important; }
+    .log-row .small { color: var(--text-secondary); font-size: 0.9rem !important; }
+    
+    .inline-filter-row th, .inline-filter-row td {
+      padding: 0.35rem 0.5rem !important;
+      background: var(--bg-surface) !important;
+      border-bottom: 2px solid var(--border) !important;
+      border-top: none !important;
+    }
+    .inline-filter-row input {
+      width: 100%;
+      padding: 0.25rem 0.4rem;
+      font-size: 0.9rem;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      outline: none;
+    }
+    .inline-filter-row input:focus { border-color: var(--accent); }
+
+    .addr-cell { max-width: 250px; }
+    .addr-cell .ellipsis { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--blue); font-weight: 500;}
+
+    .ops-badge-successful { background: var(--green-bg) !important; color: var(--green) !important; border: 1px solid rgba(16, 217, 160, 0.3); }
+
+    /* compact grids */
+    .compact-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+    .compact-header { padding: 0.65rem 0.85rem !important; }
+    .ultra-dense td { padding: 0.35rem 0.65rem !important; font-size: 0.75rem; }
+    .addr-text { color: var(--blue); font-weight: 500;}
+    .text-blue { color: var(--blue); }
+
     .log-row { cursor: pointer; transition: background 0.1s; }
+    .log-row:nth-child(even) { background: rgba(0,0,0,0.02); }
     .log-row:hover { background: var(--bg-hover) !important; }
     .uppercase { text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
-    .mt-2 { margin-top: 0.5rem; }
 </style>
 {% endblock %}

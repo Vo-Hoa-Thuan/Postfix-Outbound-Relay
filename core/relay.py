@@ -46,6 +46,9 @@ def select_next_ip(current_ip: Optional[str] = None) -> Optional[str]:
     """
     enabled = get_enabled_ips()
     if not enabled:
+        state = read_json(IP_STATE, {})
+        state["last_rotated"] = time.time()
+        write_json(IP_STATE, state)
         return None
 
     # Load rotation mode
@@ -59,6 +62,9 @@ def select_next_ip(current_ip: Optional[str] = None) -> Optional[str]:
         pool.extend([ip_cfg["ip"]] * weight)
 
     if not pool:
+        state = read_json(IP_STATE, {})
+        state["last_rotated"] = time.time()
+        write_json(IP_STATE, state)
         return None
 
     state = read_json(IP_STATE, {})
