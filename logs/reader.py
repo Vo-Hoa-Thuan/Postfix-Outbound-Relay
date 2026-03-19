@@ -142,16 +142,31 @@ def _parse_journal_incremental(state: dict) -> None:
                 new_cursor = msg_json.get("__CURSOR")
                 msg_text = msg_json.get("MESSAGE", "")
                 
+                # Reconstruct standard syslog line since regexes expect it
+                import datetime
+                ts = int(msg_json.get("__REALTIME_TIMESTAMP", 0)) / 1000000.0
+                if ts > 0:
+                    dt = datetime.datetime.fromtimestamp(ts)
+                    syslog_time = dt.strftime("%b %d %H:%M:%S")
+                else:
+                    syslog_time = msg_json.get("SYSLOG_TIMESTAMP", "Jan 01 00:00:00")
+                    
+                ident = msg_json.get("SYSLOG_IDENTIFIER", "postfix")
+                pid = msg_json.get("_PID", msg_json.get("SYSLOG_PID", "0"))
+                
+                # Reconstruct: Mar 19 23:43:00 hostname postfix/smtp[123]: <msg_text>
+                full_line = f"{syslog_time} relay {ident}[{pid}]: {msg_text}"
+                
                 # Update QID Map
-                mq = RE_QID_FROM.search(msg_text)
+                mq = RE_QID_FROM.search(full_line)
                 if mq:
                     state["qid_map"][mq.group("qid")] = mq.group("from")
                     continue
                     
-                entry = _parse_line(msg_text, state["qid_map"])
+                entry = _parse_line(full_line, state["qid_map"])
                 if entry:
                     entries.append(entry)
-            except:
+            except Exception as j_err:
                 pass
         
         if entries:
@@ -197,7 +212,7 @@ def _parse_files(target_logs: list, limit_per_file: int, state: dict) -> None:
                 _save_entries(entries)
             state["offsets"][path] = new_offset
         except Exception as e:
-            pass
+            print(f"[LogReader] Exception reading file {path}: {e}")
 
 def _parse_line(line: str, qid_map: Dict[str, str]) -> Optional[dict]:
     # Postfix SMTP
