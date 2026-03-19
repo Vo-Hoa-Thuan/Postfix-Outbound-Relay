@@ -225,11 +225,11 @@ def _parse_line(line: str, qid_map: Dict[str, str]) -> Optional[dict]:
             "from":     qid_map.get(qid, "-"), # Look up from CID map
             "to":       m_smtp.group("to"),
             "subject":  "-",
-            "dest_ip":  "",
+            "local_ip":  "",
             "status":   m_smtp.group("status").lower(),
         }
         rip = RE_RELAY_IP.search(line); 
-        if rip: entry["dest_ip"] = rip.group("ip")
+        if rip: entry["local_ip"] = rip.group("ip")
         
         # Subject is rarely in smtp line, but check just in case
         sm = RE_SUBJ.search(line); 
@@ -245,7 +245,7 @@ def _parse_line(line: str, qid_map: Dict[str, str]) -> Optional[dict]:
             "from":     m_rej.group("from"),
             "to":       m_rej.group("to"),
             "subject":  f"Rejected: {m_rej.group('reason').strip()[:60]}",
-            "dest_ip":  "blocked",
+            "local_ip":  "blocked",
             "status":   "rejected",
         }
 
@@ -258,7 +258,7 @@ def _parse_line(line: str, qid_map: Dict[str, str]) -> Optional[dict]:
             "from":     "-", # Kerio SENT line doesn't have from
             "to":       mk_sent.group("to"),
             "subject":  "-",
-            "dest_ip":  "",
+            "local_ip":  "",
             "status":   mk_sent.group("status").lower() if mk_sent.group("status") else "sent",
         }
 
@@ -271,7 +271,7 @@ def _parse_line(line: str, qid_map: Dict[str, str]) -> Optional[dict]:
             "from":     mk_recv.group("from"),
             "to":       mk_recv.group("to"),
             "subject":  mk_recv.group("subject").strip(),
-            "dest_ip":  "incoming",
+            "local_ip":  "incoming",
             "status":   "received",
         }
     return None
