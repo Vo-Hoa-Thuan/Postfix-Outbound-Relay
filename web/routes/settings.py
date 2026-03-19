@@ -76,9 +76,12 @@ async def save_settings_post(
     
     identity = {"myhostname": myhostname.strip(), "mydomain": mydomain.strip()}
     networks = mynetworks.strip()
+    # Convert message_size from MB (UI input) to bytes for Postfix
+    message_size_bytes = message_size * 1024 * 1024
+
     limits = {
         "smtpd_recipient_limit": str(recipient_limit),
-        "message_size_limit": str(message_size),
+        "message_size_limit": str(message_size_bytes),
         "default_destination_concurrency_limit": str(dest_concurrency),
         "default_destination_recipient_limit": str(dest_recipient_limit)
     }

@@ -75,7 +75,7 @@ async def _background_tasks():
 
             # 3. Incremental Log Monitoring (Every 10 seconds)
             if now - last_log_parse > 10:
-                await loop.run_in_executor(None, parse_maillog, 500)
+                await loop.run_in_executor(None, parse_maillog, 5000)
                 last_log_parse = now
                 
             # 4. Chart Pre-Aggregation (Every 60 seconds)
