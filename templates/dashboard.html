@@ -100,14 +100,16 @@
                 <tr>
                     <th style="width: 140px; cursor: pointer;" onclick="sortTable(0)">TIME ↕</th>
                     <th style="width: 130px; cursor: pointer;" onclick="sortTable(1)">LOCAL IP ↕</th>
+                    <th style="width: 130px; cursor: pointer;" onclick="sortTable(2)">DEST IP ↕</th>
                     <th style="width: 200px;">FROM</th>
                     <th style="width: 200px;">TO</th>
                     <th>SUBJECT</th>
-                    <th style="width: 110px; cursor: pointer;" onclick="sortTable(5)">STATUS ↕</th>
+                    <th style="width: 110px; cursor: pointer;" onclick="sortTable(6)">STATUS ↕</th>
                 </tr>
                 <tr class="inline-filter-row">
                     <td></td>
-                    <td><input type="text" id="fltLocal" placeholder="Filter IP" onkeyup="filterTableInline()"></td>
+                    <td><input type="text" id="fltLocal" placeholder="Filter Local IP" onkeyup="filterTableInline()"></td>
+                    <td><input type="text" id="fltDest" placeholder="Filter Dest IP" onkeyup="filterTableInline()"></td>
                     <td><input type="text" id="fltFrom" placeholder="Filter From" onkeyup="filterTableInline()"></td>
                     <td><input type="text" id="fltTo" placeholder="Filter To" onkeyup="filterTableInline()"></td>
                     <td><input type="text" id="fltSubject" placeholder="Filter Subject" onkeyup="filterTableInline()"></td>
@@ -120,13 +122,14 @@
                 <tr class="log-row" onclick="toggleDetail(this)">
                     <td class="small">{{ log.time }}</td>
                     <td class="small mono">{{ log.local_ip or '—' }}</td>
+                    <td class="small mono">{{ log.dest_ip or '—' }}</td>
                     <td class="addr-cell"><div class="ellipsis">{{ log.from }}</div></td>
                     <td class="addr-cell"><div class="ellipsis">{{ log.to }}</div></td>
                     <td class="addr-cell"><div class="ellipsis">{{ log.subject or '—' }}</div></td>
                     <td><span class="ops-badge ops-badge-{% if status_lower == 'sent' %}successful{% else %}{{ status_lower }}{% endif %}">{{ 'SUCCESSFUL' if status_lower == 'sent' else (log.status | upper) }}</span></td>
                 </tr>
                 <tr class="log-detail" style="display: none; background: rgba(0,0,0,0.1);">
-                    <td colspan="6" style="padding: 1rem; border-left: 3px solid var(--accent);">
+                    <td colspan="7" style="padding: 1rem; border-left: 3px solid var(--accent);">
                         <div style="display: flex; gap: 2rem;">
                             <div style="min-width: 200px;">
                                 <div class="text-muted small uppercase" style="font-weight: 700;">Context</div>
@@ -234,13 +237,14 @@
                 <tr class="log-row" onclick="toggleDetail(this)">
                     <td class="small">${log.time}</td>
                     <td class="small mono">${log.local_ip || '—'}</td>
+                    <td class="small mono">${log.dest_ip || '—'}</td>
                     <td class="addr-cell"><div class="ellipsis">${log.from}</div></td>
                     <td class="addr-cell"><div class="ellipsis">${log.to}</div></td>
                     <td class="addr-cell"><div class="ellipsis">${log.subject || '—'}</div></td>
                     <td><span class="ops-badge ops-badge-${badgeCls}">${badgeTxt}</span></td>
                 </tr>
                 <tr class="log-detail" style="display: none; background: rgba(0,0,0,0.1);">
-                    <td colspan="6" style="padding: 1rem; border-left: 3px solid var(--accent);">
+                    <td colspan="7" style="padding: 1rem; border-left: 3px solid var(--accent);">
                         <div style="display: flex; gap: 2rem;">
                             <div style="min-width: 200px;">
                                 <div class="text-muted small uppercase" style="font-weight: 700;">Context</div>
@@ -301,6 +305,7 @@
 
     function filterTableInline() {
         const fltLocal = document.getElementById('fltLocal') ? document.getElementById('fltLocal').value.toLowerCase().trim() : '';
+        const fltDest = document.getElementById('fltDest') ? document.getElementById('fltDest').value.toLowerCase().trim() : '';
         const fltFrom = document.getElementById('fltFrom') ? document.getElementById('fltFrom').value.toLowerCase().trim() : '';
         const fltTo = document.getElementById('fltTo') ? document.getElementById('fltTo').value.toLowerCase().trim() : '';
         const fltSubject = document.getElementById('fltSubject') ? document.getElementById('fltSubject').value.toLowerCase().trim() : '';
@@ -308,12 +313,13 @@
         const rows = document.querySelectorAll('#logBody .log-row');
         rows.forEach(row => {
             const rowLocal = row.cells[1].textContent.toLowerCase();
-            const rowFrom = row.cells[2].textContent.toLowerCase();
-            const rowTo = row.cells[3].textContent.toLowerCase();
-            const rowSubject = row.cells[4].textContent.toLowerCase();
+            const rowDest = row.cells[2].textContent.toLowerCase();
+            const rowFrom = row.cells[3].textContent.toLowerCase();
+            const rowTo = row.cells[4].textContent.toLowerCase();
+            const rowSubject = row.cells[5].textContent.toLowerCase();
             const detail = row.nextElementSibling;
             
-            if (rowLocal.includes(fltLocal) && rowFrom.includes(fltFrom) && rowTo.includes(fltTo) && rowSubject.includes(fltSubject)) {
+            if (rowLocal.includes(fltLocal) && rowDest.includes(fltDest) && rowFrom.includes(fltFrom) && rowTo.includes(fltTo) && rowSubject.includes(fltSubject)) {
                 row.style.display = '';
             } else {
                 row.style.display = 'none';
