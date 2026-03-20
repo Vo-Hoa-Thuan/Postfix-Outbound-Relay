@@ -19,7 +19,7 @@ STATE_FILE = os.path.join(BASE_DIR, "runtime", "reader_state.json")
 # Postfix
 RE_SMTP = re.compile(
     r"(?P<month>\w+)\s+(?P<day>\d+)\s+(?P<time>\d+:\d+:\d+)"
-    r".*?postfix/([^/]+/)?smtp\[\d+\]:\s+(?P<qid>\w+):\s+"
+    r".*?postfix/([^/]+/)?(smtp|lmtp|local|virtual|pipe)\[\d+\]:\s+(?P<qid>\w+):\s+"
     r"to=<(?P<to>[^>]+)>.*?"
     r"status=(?P<status>\w+)"
 )
