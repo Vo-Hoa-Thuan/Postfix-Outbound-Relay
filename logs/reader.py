@@ -41,6 +41,9 @@ RE_QID_SUBJECT = re.compile(
 RE_QID_CLIENT = re.compile(
     r"postfix/([^/]+/)?smtpd\[\d+\]:\s+(?P<qid>\w+):.*?client=[^\[]+\[(?P<ip>\d+\.\d+\.\d+\.\d+)\]"
 )
+RE_QID_ERROR = re.compile(
+    r"postfix/([^/]+)\[\d+\]:\s+(?P<qid>\w+):\s+(?P<level>fatal|error|warning):\s+(?P<msg>.*)"
+)
 
 # Extra fields lookup
 RE_RELAY_IP = re.compile(r"relay=[^\[]+\[(?P<ip>\d+\.\d+\.\d+\.\d+)\]")
@@ -184,6 +187,13 @@ def _parse_journal_incremental(state: dict) -> None:
                     if qid not in state["qid_map"]: state["qid_map"][qid] = {}
                     if isinstance(state["qid_map"][qid], str): state["qid_map"][qid] = {"from": state["qid_map"][qid]}
                     state["qid_map"][qid]["client"] = mq_client.group("ip")
+
+                mq_error = RE_QID_ERROR.search(full_line)
+                if mq_error:
+                    qid = mq_error.group("qid")
+                    if qid not in state["qid_map"]: state["qid_map"][qid] = {}
+                    if isinstance(state["qid_map"][qid], str): state["qid_map"][qid] = {"from": state["qid_map"][qid]}
+                    state["qid_map"][qid]["error"] = mq_error.group("msg").strip()
                     
                 entry = _parse_line(full_line, state["qid_map"])
                 if entry:
@@ -274,6 +284,7 @@ def _parse_line(line: str, qid_map: Dict[str, str]) -> Optional[dict]:
             "local_ip":  client_ip,
             "dest_ip":   "",
             "status":   m_smtp.group("status").lower(),
+            "error_msg": qid_info.get("error") if isinstance(qid_info, dict) else None
         }
         rip = RE_RELAY_IP.search(line); 
         if rip: entry["dest_ip"] = rip.group("ip")
@@ -282,6 +293,24 @@ def _parse_line(line: str, qid_map: Dict[str, str]) -> Optional[dict]:
         sm = RE_SUBJ.search(line); 
         if sm: entry["subject"] = sm.group(1).strip()
         return entry
+
+    # Postfix QID Error (Catching fatal/warning lines)
+    m_err = RE_QID_ERROR.search(line)
+    if m_err:
+        qid = m_err.group("qid")
+        qid_info = qid_map.get(qid, {})
+        msg_from = qid_info if isinstance(qid_info, str) else qid_info.get("from", "-")
+        
+        return {
+            "time":     _parse_timestamp(line.split()[0], line.split()[1], line.split()[2]),
+            "qid":      qid,
+            "from":     msg_from,
+            "to":       "-",
+            "subject":  f"SYSTEM ERROR: {m_err.group('msg').strip()[:60]}",
+            "local_ip":  "",
+            "dest_ip":  "error",
+            "status":   "bounced",
+        }
 
     # Postfix Reject
     m_rej = RE_REJECT.search(line)
