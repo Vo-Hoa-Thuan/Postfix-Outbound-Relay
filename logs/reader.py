@@ -170,7 +170,6 @@ def _parse_journal_incremental(state: dict) -> None:
                     if qid not in state["qid_map"]: state["qid_map"][qid] = {}
                     if isinstance(state["qid_map"][qid], str): state["qid_map"][qid] = {"from": state["qid_map"][qid]}
                     state["qid_map"][qid]["from"] = mq_from.group("from")
-                    continue
                 
                 mq_subj = RE_QID_SUBJECT.search(full_line)
                 if mq_subj:
@@ -178,7 +177,6 @@ def _parse_journal_incremental(state: dict) -> None:
                     if qid not in state["qid_map"]: state["qid_map"][qid] = {}
                     if isinstance(state["qid_map"][qid], str): state["qid_map"][qid] = {"from": state["qid_map"][qid]}
                     state["qid_map"][qid]["subject"] = mq_subj.group("subject").strip()
-                    continue
 
                 mq_client = RE_QID_CLIENT.search(full_line)
                 if mq_client:
@@ -186,7 +184,6 @@ def _parse_journal_incremental(state: dict) -> None:
                     if qid not in state["qid_map"]: state["qid_map"][qid] = {}
                     if isinstance(state["qid_map"][qid], str): state["qid_map"][qid] = {"from": state["qid_map"][qid]}
                     state["qid_map"][qid]["client"] = mq_client.group("ip")
-                    continue
                     
                 entry = _parse_line(full_line, state["qid_map"])
                 if entry:
