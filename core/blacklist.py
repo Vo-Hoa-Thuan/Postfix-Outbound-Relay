@@ -22,6 +22,9 @@ def check_ip_blacklist(ip_address: str, force_refresh: bool = False) -> Dict[str
     Returns normalized status: CLEAN, BLACKLISTED, ERROR, CACHED.
     """
     now = time.time()
+    if not ip_address:
+        return {"ip": ip_address, "status": "ERROR", "error": "Invalid IP", "is_blacklisted": False, "blacklists": [], "checked_at": now}
+        
     cache = read_json(CACHE_FILE, {})
     
     # Check cache (24 hours = 86400 seconds)
@@ -162,11 +165,15 @@ def auto_check_all():
     
     for ip_data in config.get("ips", []):
         ip = ip_data.get("ip")
+        if not ip: continue
         if ip_data.get("enabled", True) or ip_data.get("blacklist_status") == "BLACKLISTED":
-            res = process_ip_blacklist_alert(ip)
-            checked_count += 1
-            if res.get("is_blacklisted"):
-                blacklisted_count += 1
+            try:
+                res = process_ip_blacklist_alert(ip)
+                checked_count += 1
+                if res.get("is_blacklisted"):
+                    blacklisted_count += 1
+            except Exception as e:
+                print(f"[Blacklist] Error checking IP {ip}: {e}")
             time.sleep(1) # Small delay
             
     summary = {
