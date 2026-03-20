@@ -31,9 +31,12 @@ RE_REJECT = re.compile(
     r"from=<(?P<from>[^>]+)>\s+to=<(?P<to>[^>]+)>"
 )
 
-# QID to From lookup (for Postfix)
+# QID to metadata lookup (for Postfix)
 RE_QID_FROM = re.compile(
     r"postfix/([^/]+/)?(smtpd|qmgr|cleanup)\[\d+\]:\s+(?P<qid>\w+):.*?from=<(?P<from>[^>]+)>"
+)
+RE_QID_SUBJECT = re.compile(
+    r"postfix/([^/]+/)?cleanup\[\d+\]:\s+(?P<qid>\w+):.*?header Subject:\s+(?P<subject>.*?)(?:\s+from\s+[^;]+;|\s+from=|\s+proto=|\s+helo=)"
 )
 
 # Extra fields lookup
@@ -153,14 +156,25 @@ def _parse_journal_incremental(state: dict) -> None:
                     
                 ident = msg_json.get("SYSLOG_IDENTIFIER", "postfix")
                 pid = msg_json.get("_PID", msg_json.get("SYSLOG_PID", "0"))
-                
+
                 # Reconstruct: Mar 19 23:43:00 hostname postfix/smtp[123]: <msg_text>
                 full_line = f"{syslog_time} relay {ident}[{pid}]: {msg_text}"
                 
-                # Update QID Map
-                mq = RE_QID_FROM.search(full_line)
-                if mq:
-                    state["qid_map"][mq.group("qid")] = mq.group("from")
+                # Update QID Map (From and Subject)
+                mq_from = RE_QID_FROM.search(full_line)
+                if mq_from:
+                    qid = mq_from.group("qid")
+                    if qid not in state["qid_map"]: state["qid_map"][qid] = {}
+                    if isinstance(state["qid_map"][qid], str): state["qid_map"][qid] = {"from": state["qid_map"][qid]}
+                    state["qid_map"][qid]["from"] = mq_from.group("from")
+                    continue
+                
+                mq_subj = RE_QID_SUBJECT.search(full_line)
+                if mq_subj:
+                    qid = mq_subj.group("qid")
+                    if qid not in state["qid_map"]: state["qid_map"][qid] = {}
+                    if isinstance(state["qid_map"][qid], str): state["qid_map"][qid] = {"from": state["qid_map"][qid]}
+                    state["qid_map"][qid]["subject"] = mq_subj.group("subject").strip()
                     continue
                     
                 entry = _parse_line(full_line, state["qid_map"])
@@ -200,8 +214,19 @@ def _parse_files(target_logs: list, limit_per_file: int, state: dict) -> None:
                 for line in f:
                     new_offset = f.tell()
                     # Update QID map from file
-                    mq = RE_QID_FROM.search(line)
-                    if mq: state["qid_map"][mq.group("qid")] = mq.group("from")
+                    mq_from = RE_QID_FROM.search(line)
+                    if mq_from:
+                        qid = mq_from.group("qid")
+                        if qid not in state["qid_map"]: state["qid_map"][qid] = {}
+                        if isinstance(state["qid_map"][qid], str): state["qid_map"][qid] = {"from": state["qid_map"][qid]}
+                        state["qid_map"][qid]["from"] = mq_from.group("from")
+                    
+                    mq_subj = RE_QID_SUBJECT.search(line)
+                    if mq_subj:
+                        qid = mq_subj.group("qid")
+                        if qid not in state["qid_map"]: state["qid_map"][qid] = {}
+                        if isinstance(state["qid_map"][qid], str): state["qid_map"][qid] = {"from": state["qid_map"][qid]}
+                        state["qid_map"][qid]["subject"] = mq_subj.group("subject").strip()
                     
                     entry = _parse_line(line, state["qid_map"])
                     if entry: entries.append(entry)
@@ -219,12 +244,17 @@ def _parse_line(line: str, qid_map: Dict[str, str]) -> Optional[dict]:
     m_smtp = RE_SMTP.search(line)
     if m_smtp:
         qid = m_smtp.group("qid")
+        qid_info = qid_map.get(qid, {})
+        # Compatibility with old string-based qid_map
+        msg_from = qid_info if isinstance(qid_info, str) else qid_info.get("from", "-")
+        msg_subj = qid_info.get("subject", "-") if isinstance(qid_info, dict) else "-"
+        
         entry = {
             "time":     _parse_timestamp(m_smtp.group("month"), m_smtp.group("day"), m_smtp.group("time")),
             "qid":      qid,
-            "from":     qid_map.get(qid, "-"), # Look up from CID map
+            "from":     msg_from,
             "to":       m_smtp.group("to"),
-            "subject":  "-",
+            "subject":  msg_subj,
             "local_ip":  "",
             "status":   m_smtp.group("status").lower(),
         }
