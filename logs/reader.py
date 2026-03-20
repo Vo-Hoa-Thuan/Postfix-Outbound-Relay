@@ -36,11 +36,14 @@ RE_QID_FROM = re.compile(
     r"postfix/([^/]+/)?(smtpd|qmgr|cleanup)\[\d+\]:\s+(?P<qid>\w+):.*?from=<(?P<from>[^>]+)>"
 )
 RE_QID_SUBJECT = re.compile(
-    r"postfix/([^/]+/)?cleanup\[\d+\]:\s+(?P<qid>\w+):.*?header Subject:\s+(?P<subject>.*?)(?:\s+from\s+[^;]+;|\s+from=|\s+proto=|\s+helo=)"
+    r"postfix/([^/]+/)?cleanup\[\d+\]:\s+(?P<qid>\w+):.*?header Subject:\s+(?P<subject>.*?)(?=\s+from\s+[^;]+;|\s+from=|\s+proto=|\s+helo=|$)"
+)
+RE_QID_CLIENT = re.compile(
+    r"postfix/([^/]+/)?smtpd\[\d+\]:\s+(?P<qid>\w+):.*?client=[^\[]+\[(?P<ip>\d+\.\d+\.\d+\.\d+)\]"
 )
 
 # Extra fields lookup
-RE_RELAY_IP = re.compile(r"relay=[^[]+\[(?P<ip>\d+\.\d+\.\d+\.\d+)\]")
+RE_RELAY_IP = re.compile(r"relay=[^\[]+\[(?P<ip>\d+\.\d+\.\d+\.\d+)\]")
 RE_SUBJ     = re.compile(r"(?i)(?:subject=|warning: header Subject: )([^,\n;]+)")
 
 # Kerio Connect
@@ -176,6 +179,14 @@ def _parse_journal_incremental(state: dict) -> None:
                     if isinstance(state["qid_map"][qid], str): state["qid_map"][qid] = {"from": state["qid_map"][qid]}
                     state["qid_map"][qid]["subject"] = mq_subj.group("subject").strip()
                     continue
+
+                mq_client = RE_QID_CLIENT.search(full_line)
+                if mq_client:
+                    qid = mq_client.group("qid")
+                    if qid not in state["qid_map"]: state["qid_map"][qid] = {}
+                    if isinstance(state["qid_map"][qid], str): state["qid_map"][qid] = {"from": state["qid_map"][qid]}
+                    state["qid_map"][qid]["client"] = mq_client.group("ip")
+                    continue
                     
                 entry = _parse_line(full_line, state["qid_map"])
                 if entry:
@@ -227,6 +238,13 @@ def _parse_files(target_logs: list, limit_per_file: int, state: dict) -> None:
                         if qid not in state["qid_map"]: state["qid_map"][qid] = {}
                         if isinstance(state["qid_map"][qid], str): state["qid_map"][qid] = {"from": state["qid_map"][qid]}
                         state["qid_map"][qid]["subject"] = mq_subj.group("subject").strip()
+                        
+                    mq_client = RE_QID_CLIENT.search(line)
+                    if mq_client:
+                        qid = mq_client.group("qid")
+                        if qid not in state["qid_map"]: state["qid_map"][qid] = {}
+                        if isinstance(state["qid_map"][qid], str): state["qid_map"][qid] = {"from": state["qid_map"][qid]}
+                        state["qid_map"][qid]["client"] = mq_client.group("ip")
                     
                     entry = _parse_line(line, state["qid_map"])
                     if entry: entries.append(entry)
@@ -248,6 +266,7 @@ def _parse_line(line: str, qid_map: Dict[str, str]) -> Optional[dict]:
         # Compatibility with old string-based qid_map
         msg_from = qid_info if isinstance(qid_info, str) else qid_info.get("from", "-")
         msg_subj = qid_info.get("subject", "-") if isinstance(qid_info, dict) else "-"
+        client_ip = qid_info.get("client", "") if isinstance(qid_info, dict) else ""
         
         entry = {
             "time":     _parse_timestamp(m_smtp.group("month"), m_smtp.group("day"), m_smtp.group("time")),
@@ -255,7 +274,7 @@ def _parse_line(line: str, qid_map: Dict[str, str]) -> Optional[dict]:
             "from":     msg_from,
             "to":       m_smtp.group("to"),
             "subject":  msg_subj,
-            "local_ip":  "",
+            "local_ip":  client_ip,
             "dest_ip":   "",
             "status":   m_smtp.group("status").lower(),
         }
