@@ -134,7 +134,7 @@ def _parse_journal_incremental(state: dict) -> None:
         if cursor:
             cmd += ["--after-cursor", cursor]
         else:
-            cmd += ["-n", "1000"] # First run, get some history
+            cmd += ["-n", "50000"] # First run, get more history since file might be dead
 
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
         stdout, _ = proc.communicate()
