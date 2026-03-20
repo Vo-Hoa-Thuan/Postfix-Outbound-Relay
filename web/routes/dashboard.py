@@ -22,8 +22,9 @@ def _read_recent_logs(limit=20):
         with open(parsed_log, "rb") as f:
             f.seek(0, os.SEEK_END)
             size = f.tell()
-            # Seek back 64KB - plenty for dozens of JSON lines
-            offset = max(0, size - 65536)
+            # Estimate 250 bytes per log line on average
+            bytes_to_read = min(size, limit * 250 + 10000)
+            offset = max(0, size - bytes_to_read)
             f.seek(offset)
             raw = f.read().decode("utf-8", errors="replace")
             lines = raw.splitlines()
@@ -120,15 +121,17 @@ async def api_logs(
     status: str = "",
     sender: str = "",
     recipient: str = "",
+    date: str = "",
     limit: int = 50
 ):
     """Enhanced logs API with filtering."""
     # Read more lines if we are filtering
-    read_limit = 1000 if (ip or status or sender or recipient) else limit
+    read_limit = 2000 if (ip or status or sender or recipient or date) else limit
     logs = _read_recent_logs(read_limit)
     
     filtered = []
     for l in logs:
+        if date and not l.get("time", "").startswith(date): continue
         if ip and l.get("local_ip") != ip: continue
         if status and l.get("status") != status: continue
         if sender and sender.lower() not in l.get("from", "").lower(): continue

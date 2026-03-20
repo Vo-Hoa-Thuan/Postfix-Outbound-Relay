@@ -83,8 +83,9 @@
     <div class="ops-card-header" style="padding: 0.5rem 1rem; background: var(--bg-elevated); border-bottom: 2px solid var(--border);">
         <h3 class="ops-card-title" style="font-size: 0.95rem; text-transform: uppercase;"><span>📡 Activity Feed</span></h3>
         <div style="display: flex; gap: 0.5rem; align-items: center;">
-            <div class="filter-group">
-                <select id="filter-ip-top" class="form-input btn-xs" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; height: auto;" onchange="refreshLogs()">
+            <div class="filter-group" style="display: flex; gap: 0.5rem;">
+                <input type="date" id="filter-date-top" class="form-input btn-xs" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; height: auto; outline: none; border-radius: 3px; border: 1px solid var(--border); background: var(--bg-base); color: var(--text-primary);" onchange="refreshLogs()">
+                <select id="filter-ip-top" class="form-input btn-xs" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; height: auto; outline: none; border-radius: 3px; border: 1px solid var(--border); background: var(--bg-base); color: var(--text-primary);" onchange="refreshLogs()">
                     <option value="">-- TẤT CẢ IP --</option>
                     {% for uip in unique_ips %}
                     <option value="{{ uip }}">{{ uip }}</option>
@@ -215,9 +216,11 @@
         if (isRefreshingLogs) return;
         isRefreshingLogs = true;
         const topIp = document.getElementById('filter-ip-top').value;
+        const topDate = document.getElementById('filter-date-top').value;
         try {
             const params = new URLSearchParams({ limit: 50 });
             if (topIp) params.append('ip', topIp);
+            if (topDate) params.append('date', topDate);
             const res = await fetch(`/api/logs?${params.toString()}`);
             const data = await res.json();
             renderLogs(data);

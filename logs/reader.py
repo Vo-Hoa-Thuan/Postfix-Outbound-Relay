@@ -212,9 +212,9 @@ def _parse_files(target_logs: list, limit_per_file: int, state: dict) -> None:
         file_size = os.path.getsize(path)
         if file_size < offset: offset = 0
         
-        # If starting fresh on a giant file, fast-forward to the last 1MB
-        if offset == 0 and file_size > 2 * 1024 * 1024:
-            offset = file_size - (1 * 1024 * 1024)
+        # If starting fresh on a giant file, fast-forward to the last 5MB
+        if offset == 0 and file_size > 5 * 1024 * 1024:
+            offset = file_size - (5 * 1024 * 1024)
             
         entries = []
         new_offset = offset
