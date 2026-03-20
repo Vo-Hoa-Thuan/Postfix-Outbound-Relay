@@ -92,7 +92,7 @@ async def dashboard(request: Request):
     # Fetch unique local IPs and Dates for the filter dropdown
     recent_for_stats = _read_recent_logs(2000)
     unique_local_ips = sorted(list(set(l.get("local_ip") for l in recent_for_stats if l.get("local_ip"))))
-    unique_dates = sorted(list(set(l.get("time", "")[:10] for l in recent_for_stats if len(l.get("time", "")) >= 10)), reverse=True)
+    unique_dates = sorted(list(set(l.get("time", "")[:10] for l in recent_for_stats if len(l.get("time", "")) >= 10)), reverse=True)[:5]
 
     # Top stats logic
     from collections import Counter
