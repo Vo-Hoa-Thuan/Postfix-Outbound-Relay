@@ -147,6 +147,9 @@
                                 <div class="text-muted small uppercase" style="font-weight: 700;">Context</div>
                                 <div class="mono small">ID: {{ log.msgid or '—' }}</div>
                                 <div class="mono small">QID: {{ log.qid or '—' }}</div>
+                                {% if log.error_msg %}
+                                <div style="margin-top: 0.5rem; color: var(--red); font-weight: bold; font-size: 0.75rem;">⚠️ ERROR: {{ log.error_msg }}</div>
+                                {% endif %}
                             </div>
                             <div style="flex: 1;">
                                 <div class="text-muted small uppercase" style="font-weight: 700;">Response</div>

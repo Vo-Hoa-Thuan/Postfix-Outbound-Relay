@@ -202,6 +202,13 @@ async def check_all_blacklist_route(force: bool = Form(False)):
             
     return RedirectResponse("/ips?msg=Blacklist+check+started+in+background+for+all+enabled+IPs.", status_code=303)
 
+@router.get("/sync-status")
+async def get_sync_status():
+    """API for monitoring background blacklist scanner progress."""
+    from core.fileio import read_json
+    LAST_CHECK_FILE = os.path.join(BASE_DIR, "runtime", "last_auto_check.json")
+    return read_json(LAST_CHECK_FILE, {"status": "idle"})
+
 @router.get("/status/{ip}")
 async def get_ip_status(ip: str):
     """API for AJAX status updates."""

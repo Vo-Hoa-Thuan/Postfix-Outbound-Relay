@@ -4,315 +4,360 @@
 {% block title %}IP Management – Operations Console{% endblock %}
 
 {% block content %}
-<div class="section-header" style="margin-bottom: 2rem;">
-    <h2 style="color: var(--accent); font-size: 1.1rem; letter-spacing: 0.1em; text-transform: uppercase;" data-i18n="ttl_ips_infra">🌐 Relay IP Infrastructure</h2>
-</div>
-
-<!-- System Insights Compact Bar -->
-<div class="ops-compact-header" style="margin-bottom: 1.5rem; display: flex; gap: 2rem; align-items: center; background: var(--bg-elevated); padding: 0.75rem 1.5rem; border-radius: 6px; border: 1px solid var(--border);">
-    <div style="display: flex; flex-direction: column;">
-        <span data-i18n="lbl_total_managed" style="color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; font-weight: bold; letter-spacing: 0.05em;">Total Managed IPs</span>
-        <span style="font-size: 1.25rem; font-weight: 800; font-family: var(--ff-mono);">{{ ips | length }}</span>
-    </div>
-    <div style="border-left: 1px solid var(--border); padding-left: 2rem; display: flex; flex-direction: column;">
-        <span data-i18n="lbl_active_online" style="color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; font-weight: bold; letter-spacing: 0.05em;">Active (Online)</span>
-        <span class="text-success" style="font-size: 1.25rem; font-weight: 800; font-family: var(--ff-mono); color: var(--green);">{{ (ips | selectattr('enabled') | list | length) }}</span>
-    </div>
-    <div style="border-left: 1px solid var(--border); padding-left: 2rem; display: flex; flex-direction: column;">
-        <span data-i18n="lbl_curr_relay" style="color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; font-weight: bold; letter-spacing: 0.05em;">Current Relay</span>
-        <span class="text-accent mono" style="font-size: 1.25rem; font-weight: 800; color: var(--accent);">{{ active_ip or 'None' }}</span>
-    </div>
-</div>
-
-<!-- Horizontal Provision Form -->
-<div class="ops-card" style="margin-bottom: 1.5rem; border-top: 3px solid var(--accent); background: var(--bg-surface); box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-    <div class="ops-card-header" style="padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border);">
-        <h3 class="ops-card-title" data-i18n="ttl_provision_ip" style="font-size: 0.95rem; margin: 0; display: flex; align-items: center; gap: 0.5rem;">
-            <span>🚀</span> Cấu hình IP Mới (Provision New IP)
-        </h3>
-    </div>
-    <div class="ops-card-body" style="padding: 1.25rem;">
-        <form action="/ips/add" method="post" style="margin: 0;">
-            <!-- Row 1: IPs and Hostname -->
-            <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-                <div class="form-group" style="margin: 0; flex: 1;">
-                    <label data-i18n="lbl_ip_addr" style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.3rem;">IP Address <span style="color: var(--red);">*</span></label>
-                    <input type="text" name="ip" placeholder="1.2.3.4" class="form-input" required style="width: 100%; border: 1px solid var(--border); background: var(--bg-base); height: 38px; padding: 0 0.75rem;" />
-                </div>
-                <div class="form-group" style="margin: 0; flex: 1.5;">
-                    <label data-i18n="lbl_hostname" style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.3rem;">Hostname / Helo</label>
-                    <input type="text" name="hostname" placeholder="relay.example.com" class="form-input" style="width: 100%; border: 1px solid var(--border); background: var(--bg-base); height: 38px; padding: 0 0.75rem;" />
-                </div>
-            </div>
-            
-            <!-- Row 2: Settings -->
-            <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
-                <div class="form-group" style="margin: 0; width: 100px;">
-                    <label data-i18n="lbl_weight" style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.3rem;">Weight</label>
-                    <input type="number" name="weight" value="1" min="1" class="form-input" style="width: 100%; border: 1px solid var(--border); background: var(--bg-base); height: 38px; padding: 0 0.5rem; text-align: center;" />
-                </div>
-                <div class="form-group" style="margin: 0; width: 120px;">
-                    <label data-i18n="lbl_limit_hr" style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.3rem;">Limit / Hour</label>
-                    <input type="number" name="limit_per_hour" value="2000" min="0" class="form-input" style="width: 100%; border: 1px solid var(--border); background: var(--bg-base); height: 38px; padding: 0 0.5rem; text-align: center;" />
-                </div>
-                <div class="form-group" style="margin: 0; flex: 1; min-width: 200px;">
-                    <label data-i18n="lbl_note" style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.3rem;">Operational Note</label>
-                    <input type="text" name="note" placeholder="Location, Provider, etc." class="form-input" style="width: 100%; border: 1px solid var(--border); background: var(--bg-base); height: 38px; padding: 0 0.75rem;" />
-                </div>
-                <div class="form-group" style="margin: 0; padding-bottom: 0.5rem; padding-right: 0.5rem;">
-                    <label class="toggle-label" style="font-size: 0.8rem; cursor: pointer;">
-                        <input type="checkbox" name="warmup_enabled" value="on" class="toggle-input" />
-                        <span class="toggle-track" style="transform: scale(0.9); margin-right: 6px;"><span class="toggle-thumb"></span></span>
-                        <span data-i18n="lbl_warmup" style="color: var(--text-primary); font-weight: 500;">Warm-up</span>
-                    </label>
-                </div>
-                <button type="submit" class="btn btn-primary" style="height: 38px; padding: 0 1.5rem; display: flex; align-items: center; gap: 0.5rem;" data-i18n="btn_provision">
-                    <span>➕</span> Thêm IP / Cấu hình
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<div class="dashboard-grid" style="grid-template-columns: 1fr;">
+<style>
+    /* Premium UI Enhancements */
+    .glass-header {
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
+    .stat-card-premium {
+        background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+        border: 1px solid rgba(255,255,255,0.08);
+        padding: 1rem 1.5rem;
+        border-radius: 10px;
+        transition: transform 0.3s ease;
+    }
+    .stat-card-premium:hover { transform: translateY(-3px); border-color: var(--accent); }
     
-    <!-- Level: IP List -->
-    <div class="ops-card">
-        <div class="ops-card-header">
-            <h3 class="ops-card-title"><span data-i18n="ttl_active_relay">Active Relay IPs</span> <span class="text-muted" style="font-weight: normal; margin-left: 0.5rem;">({{ ips | length }})</span></h3>
-            <div style="display: flex; gap: 0.5rem;">
-                <form action="/ips/check-all-blacklist" method="post" id="bulkCheckForm" style="display: flex; gap: 0.5rem;">
-                    <input type="hidden" name="force" value="false" id="bulkForce">
-                    <button type="submit" class="btn btn-secondary btn-xs" data-i18n="btn_dnsbl_sync">🛡️ DNSBL Sync</button>
-                    <button type="button" class="btn btn-secondary btn-xs" onclick="bulkCheck(true)" data-i18n="btn_force_refresh">🔥 Force Refresh</button>
-                </form>
-            </div>
+    .sync-progress-bar {
+        height: 4px;
+        background: var(--bg-elevated);
+        border-radius: 2px;
+        overflow: hidden;
+        margin-top: 0.5rem;
+        display: none;
+    }
+    .sync-progress-fill {
+        height: 100%;
+        background: var(--accent);
+        width: 0%;
+        transition: width 0.5s ease;
+    }
+    
+    .ip-table-premium { width: 100%; border-collapse: separate; border-spacing: 0 0.5rem; }
+    .ip-table-premium tr { background: rgba(255,255,255,0.02); transition: all 0.2s; }
+    .ip-table-premium tr:hover { background: rgba(255,255,255,0.05); transform: scale(1.002); }
+    .ip-table-premium td, .ip-table-premium th { padding: 1.25rem 1rem; border: none; }
+    .ip-table-premium tr td:first-child { border-radius: 8px 0 0 8px; border-left: 3px solid transparent; }
+    .ip-table-premium tr td:last-child { border-radius: 0 8px 8px 0; }
+    .ip-table-premium tr.row-active td:first-child { border-left-color: var(--accent); }
+    
+    .badge-status-premium {
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .status-clean { background: rgba(16,217,160,0.15); color: #10d9a0; border: 1px solid rgba(16,217,160,0.2); }
+    .status-blacklisted { background: rgba(255,71,87,0.15); color: #ff4757; border: 1px solid rgba(255,71,87,0.2); animation: pulse-error 2s infinite; }
+    .status-scanning { background: rgba(255,165,2,0.15); color: #ffa502; border: 1px solid rgba(255,165,2,0.2); }
+    
+    @keyframes pulse-error {
+        0% { box-shadow: 0 0 0 0 rgba(255,71,87, 0.4); }
+        70% { box-shadow: 0 0 0 10px rgba(255,71,87, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(255,71,87, 0); }
+    }
+</style>
+
+<div class="section-header" style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+    <div>
+        <h2 style="color: var(--accent); font-size: 1.2rem; letter-spacing: 0.1em; text-transform: uppercase;" data-i18n="ttl_ips_infra">🌐 Infrastructure Manager</h2>
+        <p class="text-muted small" style="margin-top: 4px;" data-i18n="txt_monitor_infra">Monitor and provision your IP rotation pool</p>
+    </div>
+    <div id="sync-status-box" style="display: none; text-align: right; background: rgba(255,255,255,0.05); padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid var(--border);">
+        <span class="small bold" style="color: var(--yellow);" data-i18n="status_scanning_dnsbl">🛡️ DNSBL Background Scanning...</span>
+        <div class="small text-muted" id="sync-progress-text">IP: 0.0.0.0 (0/0)</div>
+        <div class="sync-progress-bar" style="display: block; width: 150px; margin-left: auto;"><div class="sync-progress-fill" id="sync-progress-fill"></div></div>
+    </div>
+</div>
+
+<div class="dashboard-grid" style="grid-template-columns: 2fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+    <!-- Left: Stats -->
+    <div class="glass-header" style="margin-bottom: 0; display: flex; gap: 1.5rem; align-items: center; justify-content: space-around;">
+        <div class="stat-card-premium">
+            <span class="text-muted small uppercase bold" data-i18n="lbl_total_managed">Managed Pool</span>
+            <div style="font-size: 1.5rem; font-weight: 800; font-family: var(--ff-mono);">{{ ips | length }}</div>
         </div>
-        <div class="ops-card-body" style="padding: 0;">
-            {% if ips %}
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th data-i18n="col_ip_host">IP / Hostname</th>
-                        <th data-i18n="col_relay_status">Relay Status</th>
-                        <th data-i18n="col_bl_status">Blacklist Status</th>
-                        <th data-i18n="col_details">Details</th>
-                        <th style="text-align: right;" data-i18n="col_actions">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for ip in ips %}
-                    <tr class="{% if ip.ip == active_ip %}row-active{% endif %}" id="row-{{ ip.ip | replace('.', '-') }}">
-                        <td>
-                            <div style="display: flex; align-items: center; gap: 0.75rem;">
-                                <div class="mono" style="font-weight: 700; color: var(--accent);">{{ ip.ip }}</div>
-                                {% if ip.ip == active_ip %}
-                                <span class="badge badge-blue" data-i18n="status_active">ACTIVE</span>
-                                {% endif %}
-                            </div>
-                            {% if ip.hostname %}<div class="text-muted" style="font-size: 0.75rem; margin-top: 2px;">{{ ip.hostname }}</div>{% endif %}
-                        </td>
-                        <td>
-                            <form action="/ips/toggle" method="post">
-                                <input type="hidden" name="ip" value="{{ ip.ip }}" />
-                                <button type="submit" class="badge-btn" style="border: 1px solid {% if ip.enabled %}rgba(16,217,160,0.5){% else %}rgba(255,100,100,0.5){% endif %}; cursor: pointer; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 0.7rem; background: {% if ip.enabled %}rgba(16,217,160,0.1){% else %}rgba(255,100,100,0.1){% endif %}; color: {% if ip.enabled %}var(--green){% else %}var(--red){% endif %}; box-shadow: 0 0 8px {% if ip.enabled %}rgba(16,217,160,0.15){% else %}rgba(255,100,100,0.15){% endif %};" data-i18n="status_{% if ip.enabled %}online{% else %}offline{% endif %}">
-                                    {% if ip.enabled %}🟢 ONLINE{% else %}🔴 OFFLINE{% endif %}
-                                </button>
-                            </form>
-                        </td>
-                        <td>
-                            {% set bl_status = ip.blacklist_status or "NOT CHECKED" %}
-                            <div id="bl-container-{{ ip.ip | replace('.', '-') }}">
-                                <span class="badge" style="padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; border: 1px solid {% if bl_status == 'CLEAN' %}rgba(16,217,160,0.3){% elif bl_status == 'BLACKLISTED' %}rgba(255,100,100,0.3){% elif 'CACHED' in bl_status %}rgba(250,175,0,0.3){% else %}rgba(255,255,255,0.1){% endif %}; background: {% if bl_status == 'CLEAN' %}rgba(16,217,160,0.1){% elif bl_status == 'BLACKLISTED' %}rgba(255,100,100,0.1){% elif 'CACHED' in bl_status %}rgba(250,175,0,0.1){% else %}rgba(255,255,255,0.05){% endif %}; color: {% if bl_status == 'CLEAN' %}var(--green){% elif bl_status == 'BLACKLISTED' %}var(--red){% elif 'CACHED' in bl_status %}var(--yellow){% else %}var(--text-muted){% endif %};" id="status-badge-{{ ip.ip | replace('.', '-') }}" data-i18n="status_{{ bl_status.lower().replace(' ', '_') }}">
-                                    {{ bl_status }}
-                                </span>
-                            </div>
-                        </td>
-                        <td>
-                            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-                                <span class="badge badge-gray" style="font-size: 0.65rem; padding: 3px 6px; letter-spacing: 0.05em; background: rgba(255,255,255,0.05); border: 1px solid var(--border);" title="Weight">
-                                    <span style="opacity: 0.5; margin-right: 2px;">⚖️</span> W: <strong style="color: var(--text-primary);">{{ ip.weight }}</strong>
-                                </span>
-                                <span class="badge badge-gray" style="font-size: 0.65rem; padding: 3px 6px; letter-spacing: 0.05em; background: rgba(255,255,255,0.05); border: 1px solid var(--border);" title="Limit per Hour">
-                                    <span style="opacity: 0.5; margin-right: 2px;">⏱️</span> L: <strong style="color: var(--text-primary);">{{ ip.limit_per_hour }}</strong>/h
-                                </span>
-                            </div>
-                            {% if ip.note %}
-                            <div class="text-muted" style="font-size: 0.75rem; margin-top: 6px; display: flex; align-items: center; gap: 4px;">
-                                <span style="opacity: 0.5; font-size: 0.7rem;">📝</span> <span class="ellipsis" style="max-width: 180px;" title="{{ ip.note }}">{{ ip.note }}</span>
-                            </div>
-                            {% endif %}
-                        </td>
-                        <td style="text-align: right;">
-                            <div style="display: flex; gap: 0.4rem; justify-content: flex-end; opacity: 0.8; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">
-                                <button class="btn btn-secondary btn-xs" style="padding: 4px 8px; border-radius: 4px; background: rgba(255,255,255,0.05); border: 1px solid transparent;"
-                                    data-ip="{{ ip.ip }}" data-hostname="{{ ip.hostname | default('') | e }}" data-weight="{{ ip.weight }}"
-                                    data-limit="{{ ip.limit_per_hour }}" data-note="{{ ip.note | e }}"
-                                    data-smtp-user="{{ ip.smtp_user | default('') | e }}" data-smtp-pass="{{ ip.smtp_pass | default('') | e }}"
-                                    data-enabled="{{ ip.enabled | lower }}" 
-                                    data-warmup-enabled="{{ ip.warmup_enabled | lower }}"
-                                    data-warmup-start="{{ ip.warmup_start_date | default('') }}"
-                                    onclick="openEditFromBtn(this)" title="Edit Config" data-i18n="[title]ttl_edit_config"><span class="icon" style="font-size: 0.9rem;">⚙️</span></button>
-                                
-                                <button type="button" class="btn btn-secondary btn-xs" style="padding: 4px 8px; border-radius: 4px; background: rgba(255,255,255,0.05); border: 1px solid transparent;" onclick="checkBlacklist('{{ ip.ip }}', true)" title="Check Blacklist" data-i18n="[title]ttl_check_bl">🛡️</button>
-                                
-                                {% if ip.ip != active_ip %}
-                                <form action="/ips/delete" method="post" onsubmit="return confirmDelete()">
-                                    <input type="hidden" name="ip" value="{{ ip.ip }}" />
-                                    <button type="submit" class="btn btn-secondary btn-xs text-danger" style="padding: 4px 8px; border-radius: 4px; background: rgba(255,100,100,0.1); border: 1px solid transparent; color: var(--red);" title="Remove IP" onmouseover="this.style.background='var(--red)'; this.style.color='#fff';" onmouseout="this.style.background='rgba(255,100,100,0.1)'; this.style.color='var(--red)';">✕</button>
-                                </form>
-                                {% endif %}
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <div style="padding: 3rem; text-align: center; color: var(--text-muted)">
-                <p data-i18n="txt_no_ips">No relay IPs configured. Use the panel on the right to add infrastructure.</p>
-            </div>
-            {% endif %}
+        <div class="stat-card-premium">
+            <span class="text-muted small uppercase bold" data-i18n="lbl_active_online">Active Now</span>
+            <div style="font-size: 1.5rem; font-weight: 800; font-family: var(--ff-mono); color: var(--green);">{{ (ips | selectattr('enabled') | list | length) }}</div>
+        </div>
+        <div class="stat-card-premium">
+            <span class="text-muted small uppercase bold" data-i18n="lbl_curr_relay">Current Master</span>
+            <div class="text-accent mono" style="font-size: 1.5rem; font-weight: 800;">{{ active_ip or 'None' }}</div>
         </div>
     </div>
 
+    <!-- Right: Add IP Trigger -->
+    <div class="ops-card mb-0" style="display: flex; align-items: center; justify-content: center; background: linear-gradient(45deg, var(--bg-surface), rgba(0,0,0,0.2));">
+        <button class="btn btn-primary" onclick="document.getElementById('addModal').style.display='flex'" style="padding: 1rem 2rem; border-radius: 12px; font-weight: bold; width: 90%;" data-i18n="btn_provision">
+            <span style="font-size: 1.2rem; margin-right: 0.5rem;">🚀</span> Provision New IP
+        </button>
+    </div>
+</div>
 
-
-<!-- Edit Modal -->
-<div id="editModal" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
-    <div class="ops-card" style="width: 500px; max-width: 95vw;">
-        <div class="ops-card-header">
-            <h3 class="ops-card-title"><span data-i18n="ttl_modify_cfg">Modify Configuration:</span> <span id="editIpDisplay" class="mono text-accent"></span></h3>
-            <button onclick="closeEdit()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.2rem;">✕</button>
+<div class="ops-card">
+    <div class="ops-card-header" style="border-bottom: 1px solid var(--border);">
+        <h3 class="ops-card-title" data-i18n="ttl_active_relay">📡 Active Node List</h3>
+        <div style="display: flex; gap: 0.75rem;">
+            <button onclick="bulkSync(true)" class="btn btn-secondary btn-xs" id="btn-sync-all" data-i18n="btn_dnsbl_sync">🛡️ Sync DNSBL</button>
+            <button onclick="refreshAllStatuses()" class="btn btn-secondary btn-xs">↻ Refresh UI</button>
         </div>
-        <div class="ops-card-body">
-            <form action="/ips/edit" method="post">
-                <input type="hidden" name="ip" id="editIp" />
-                <div class="form-group">
-                    <label data-i18n="lbl_hostname">Hostname</label>
-                    <input type="text" name="hostname" id="editHostname" class="form-input" />
+    </div>
+    <div class="ops-card-body" style="padding: 0 1rem 1rem 1rem;">
+        <table class="ip-table-premium">
+            <thead>
+                <tr style="background: transparent;">
+                    <th style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted);" data-i18n="col_ip_host">IP / Hostname</th>
+                    <th style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); width: 140px;" data-i18n="col_relay_status">Relay Status</th>
+                    <th style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); width: 180px;" data-i18n="col_bl_status">Blacklist (MXToolbox)</th>
+                    <th style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted);" data-i18n="col_details">Config</th>
+                    <th style="text-align: right; font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted);" data-i18n="col_actions">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="ip-list-body">
+                {% for ip in ips %}
+                <tr id="row-{{ ip.ip | replace('.', '-') }}" class="{% if ip.ip == active_ip %}row-active{% endif %}">
+                    <td>
+                        <div style="font-weight: 700; color: #fff; font-family: var(--ff-mono); font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+                            {{ ip.ip }}
+                            {% if ip.ip == active_ip %}<span class="badge badge-blue" style="font-size: 0.6rem;">MASTER</span>{% endif %}
+                        </div>
+                        <div class="text-muted small">{{ ip.hostname or 'no-ptr-record' }}</div>
+                    </td>
+                    <td>
+                        <button onclick="toggleIp('{{ ip.ip }}')" class="badge-status-premium {% if ip.enabled %}status-clean{% else %}status-blacklisted{% endif %}" style="cursor: pointer; border-radius: 8px; width: 100px; justify-content: center;">
+                            {% if ip.enabled %}ACTIVE{% else %}PAUSED{% endif %}
+                        </button>
+                    </td>
+                    <td>
+                        {% set bl_status = ip.blacklist_status or "NOT CHECKED" %}
+                        <div id="bl-container-{{ ip.ip | replace('.', '-') }}">
+                            <span class="badge-status-premium {% if bl_status == 'CLEAN' %}status-clean{% elif bl_status == 'BLACKLISTED' %}status-blacklisted{% else %}status-scanning{% endif %}" id="bl-badge-{{ ip.ip | replace('.', '-') }}">
+                                {{ bl_status }}
+                            </span>
+                        </div>
+                    </td>
+                    <td>
+                        <div style="display: flex; gap: 0.5rem; opacity: 0.7;">
+                            <span class="small mono" title="Weight">W{{ ip.weight }}</span>
+                            <span class="small mono" title="Limit">L{{ ip.limit_per_hour }}/h</span>
+                        </div>
+                        <div class="text-accent ellipsis small" style="max-width: 150px;">{{ ip.note or '' }}</div>
+                    </td>
+                    <td style="text-align: right;">
+                        <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                            <button class="btn btn-secondary btn-xs" 
+                                    data-ip="{{ ip.ip }}" 
+                                    data-host="{{ ip.hostname or '' }}" 
+                                    data-weight="{{ ip.weight }}" 
+                                    data-limit="{{ ip.limit_per_hour }}" 
+                                    data-note="{{ ip.note|default('')|e }}" 
+                                    data-enabled="{{ 'true' if ip.enabled else 'false' }}"
+                                    onclick="openEditFromData(this)" title="Edit">
+                                <span class="icon">⚙️</span>
+                            </button>
+                            <button onclick="checkIpSingle('{{ ip.ip }}')" class="btn btn-secondary btn-xs" title="Scan Now">🛡️</button>
+                            {% if ip.ip != active_ip %}
+                            <button onclick="deleteIp('{{ ip.ip }}')" class="btn btn-secondary btn-xs text-danger">✕</button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal: Add IP -->
+<div id="addModal" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(8px);">
+    <div class="ops-card" style="width: 550px; border-top: 4px solid var(--accent);">
+        <div class="ops-card-header">
+            <h3 class="ops-card-title">Provision New Relay Infrastructure</h3>
+            <button onclick="document.getElementById('addModal').style.display='none'" style="background: none; border: none; color: #fff; cursor: pointer;">✕</button>
+        </div>
+        <div class="ops-card-body" style="padding: 1.5rem;">
+            <form action="/ips/add" method="post">
+                <div class="form-row">
+                    <div class="form-group"><label>IP Address</label><input type="text" name="ip" placeholder="1.2.3.4" class="form-input" required></div>
+                    <div class="form-group"><label>Hostname (HELO)</label><input type="text" name="hostname" placeholder="relay.example.com" class="form-input"></div>
                 </div>
                 <div class="form-row">
-                    <div class="form-group">
-                        <label data-i18n="lbl_weight">Weight</label>
-                        <input type="number" name="weight" id="editWeight" class="form-input" />
-                    </div>
-                    <div class="form-group">
-                        <label data-i18n="lbl_limit_hr">Limit / Hour</label>
-                        <input type="number" name="limit_per_hour" id="editLimit" class="form-input" />
-                    </div>
+                    <div class="form-group"><label>Weight</label><input type="number" name="weight" value="1" class="form-input"></div>
+                    <div class="form-group"><label>Limit / Hr</label><input type="number" name="limit_per_hour" value="2000" class="form-input"></div>
                 </div>
-                <div class="form-group">
-                    <label data-i18n="lbl_note">Note</label>
-                    <input type="text" name="note" id="editNote" class="form-input" />
-                </div>
-                <div class="form-group">
-                    <label class="toggle-label">
-                        <input type="checkbox" name="enabled" id="editEnabled" value="on" class="toggle-input" />
-                        <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                        <span data-i18n="lbl_ip_enabled">IP ENABLED</span>
-                    </label>
-                </div>
-                <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-                    <button type="button" class="btn btn-secondary btn-full" onclick="closeEdit()" data-i18n="btn_cancel">Cancel</button>
-                    <button type="submit" class="btn btn-primary btn-full" data-i18n="btn_save_changes">Save Changes</button>
+                <div class="form-group"><label>Operational Note</label><input type="text" name="note" class="form-input"></div>
+                <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem;">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('addModal').style.display='none'">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Start Provisioning</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
+<!-- Modal: Edit IP -->
+<div id="editModal" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1001; align-items: center; justify-content: center; backdrop-filter: blur(8px);">
+    <div class="ops-card" style="width: 550px;">
+        <div class="ops-card-header">
+            <h3 class="ops-card-title">Edit Configuration: <span id="edit-title-ip" class="text-accent mono"></span></h3>
+            <button onclick="document.getElementById('editModal').style.display='none'" style="background: none; border: none; color: #fff; cursor: pointer;">✕</button>
+        </div>
+        <div class="ops-card-body" style="padding: 1.5rem;">
+            <form action="/ips/edit" method="post">
+                <input type="hidden" name="ip" id="edit-hidden-ip">
+                <div class="form-group"><label>Hostname</label><input type="text" name="hostname" id="edit-hostname" class="form-input"></div>
+                <div class="form-row">
+                    <div class="form-group"><label>Weight</label><input type="number" name="weight" id="edit-weight" class="form-input"></div>
+                    <div class="form-group"><label>Limit / Hr</label><input type="number" name="limit_per_hour" id="edit-limit" class="form-input"></div>
+                </div>
+                <div class="form-group"><label>Operational Note</label><input type="text" name="note" id="edit-note" class="form-input"></div>
+                <div class="form-group">
+                    <label class="toggle-label"><input type="checkbox" name="enabled" id="edit-enabled" class="toggle-input"><span class="toggle-track"><span class="toggle-thumb"></span></span> IP ENABLED</label>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem;">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('editModal').style.display='none'">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    function openEditFromBtn(btn) {
+    // Global State
+    let isSyncing = false;
+
+    // UI Updates
+    function updateBadge(ipId, status) {
+        const badge = document.getElementById('bl-badge-' + ipId);
+        if (!badge) return;
+        badge.textContent = status;
+        badge.className = 'badge-status-premium ' + 
+            (status === 'CLEAN' ? 'status-clean' : 
+             status === 'BLACKLISTED' ? 'status-blacklisted' : 'status-scanning');
+    }
+
+    // Polling Logic
+    async function syncStatusPoll() {
+        try {
+            const res = await fetch('/ips/sync-status');
+            const data = await res.json();
+            const box = document.getElementById('sync-status-box');
+            
+            if (data.status === 'running') {
+                isSyncing = true;
+                box.style.display = 'block';
+                document.getElementById('sync-progress-text').textContent = `Scanning: ${data.current_ip || '...'} (${data.progress})`;
+                const parts = data.progress.split('/');
+                if (parts.length === 2) {
+                    const percent = Math.round((parseInt(parts[0]) / parseInt(parts[1])) * 100);
+                    document.getElementById('sync-progress-fill').style.width = percent + '%';
+                }
+                document.getElementById('btn-sync-all').disabled = true;
+                document.getElementById('btn-sync-all').innerText = "⏳ Syncing...";
+            } else {
+                if (isSyncing) { // Just finished
+                    refreshAllStatuses();
+                    isSyncing = false;
+                }
+                box.style.display = 'none';
+                document.getElementById('btn-sync-all').disabled = false;
+                document.getElementById('btn-sync-all').innerText = "🛡️ Sync DNSBL";
+            }
+        } catch(e) {}
+    }
+
+    async function refreshAllStatuses() {
+        try {
+            // Get Active IP first
+            const statusRes = await fetch('/api/status');
+            const statusData = await statusRes.json();
+            const activeIp = statusData.active_ip;
+
+            // Poll each IP (using our cached API for speed)
+            const rows = document.querySelectorAll('tr[id^="row-"]');
+            for (let row of rows) {
+                const ip = row.id.replace('row-', '').replace(/-/g, '.');
+                const res = await fetch('/ips/status/' + ip);
+                const data = await res.json();
+                
+                const ipId = row.id.replace('row-', '');
+                updateBadge(ipId, data.status);
+                
+                // Update MASTER badge
+                if (ip === activeIp) row.classList.add('row-active');
+                else row.classList.remove('row-active');
+            }
+        } catch(e) {}
+    }
+
+    // Actions
+    async function checkIpSingle(ip) {
+        const id = ip.replace(/\./g, '-');
+        const badge = document.getElementById('bl-badge-' + id);
+        badge.textContent = "WAITING...";
+        badge.className = "badge-status-premium status-scanning";
+        
+        const fd = new FormData(); fd.append('ip', ip); fd.append('force', 'true');
+        await fetch('/ips/check-blacklist', { method: 'POST', body: fd });
+        refreshAllStatuses();
+    }
+
+    async function bulkSync(force = false) {
+        if (force && !confirm("DNSBL Bulk scan depends on your MXToolbox quota. Continue?")) return;
+        const fd = new FormData(); fd.append('force', force ? 'true' : 'false');
+        await fetch('/ips/check-all-blacklist', { method: 'POST', body: fd });
+        isSyncing = true;
+    }
+
+    function toggleIp(ip) {
+        const fd = new FormData(); fd.append('ip', ip);
+        fetch('/ips/toggle', { method: 'POST', body: fd }).then(() => location.reload());
+    }
+
+    function deleteIp(ip) {
+        if (!confirm(`Permanently remove ${ip} from infrastructure?`)) return;
+        const fd = new FormData(); fd.append('ip', ip);
+        fetch('/ips/delete', { method: 'POST', body: fd }).then(() => location.reload());
+    }
+
+    function openEditFromData(btn) {
         const d = btn.dataset;
-        document.getElementById('editIp').value = d.ip;
-        document.getElementById('editIpDisplay').textContent = d.ip;
-        document.getElementById('editHostname').value = d.hostname;
-        document.getElementById('editWeight').value = d.weight;
-        document.getElementById('editLimit').value = d.limit;
-        document.getElementById('editNote').value = d.note;
-        document.getElementById('editEnabled').checked = d.enabled === 'true';
+        openEditModal(d.ip, d.host, d.weight, d.limit, d.note, d.enabled === 'true');
+    }
+
+    function openEditModal(ip, host, weight, limit, note, enabled) {
+        document.getElementById('edit-hidden-ip').value = ip;
+        document.getElementById('edit-title-ip').textContent = ip;
+        document.getElementById('edit-hostname').value = host;
+        document.getElementById('edit-weight').value = weight;
+        document.getElementById('edit-limit').value = limit;
+        document.getElementById('edit-note').value = note;
+        document.getElementById('edit-enabled').checked = enabled;
         document.getElementById('editModal').style.display = 'flex';
     }
+
+    // Init
+    setInterval(syncStatusPoll, 2000);
+    setInterval(refreshAllStatuses, 10000); // Slower full poll
     
-    function closeEdit() { document.getElementById('editModal').style.display = 'none'; }
-
-    function confirmDelete() {
-        const t = translations[localStorage.getItem('rp_lang') || 'vn'];
-        return confirm(t['txt_delete_confirm']);
-    }
-
-    async function checkBlacklist(ip, force = false) {
-        const id = ip.replace(/\./g, '-');
-        const badge = document.getElementById('status-badge-' + id);
-        const t = translations[localStorage.getItem('rp_lang') || 'vn'];
-        badge.textContent = t['status_waiting'];
-        badge.className = 'badge badge-gray';
-        
-        try {
-            const formData = new FormData();
-            formData.append('ip', ip);
-            formData.append('force', force ? 'true' : 'false');
-            await fetch('/ips/check-blacklist', { method: 'POST', body: formData });
-            
-            const res = await fetch('/ips/status/' + ip);
-            const data = await res.json();
-            
-            badge.textContent = getI18nStatus(data.status);
-            if (data.status === 'CLEAN') badge.className = 'badge badge-green';
-            else if (data.status === 'BLACKLISTED') badge.className = 'badge badge-red';
-            else if (data.status.includes('CACHED')) badge.className = 'badge badge-yellow';
-            
-        } catch (e) { badge.textContent = t['status_error']; }
-    }
-
-    function bulkCheck(force = false) {
-        const t = translations[localStorage.getItem('rp_lang') || 'vn'];
-        if (!force || confirm(t['txt_force_refresh_confirm'])) {
-            document.getElementById('bulkForce').value = force ? 'true' : 'false';
-            document.getElementById('bulkCheckForm').submit();
-        }
-    }
-    async function pollStatus() {
-        try {
-            const res = await fetch('/api/status');
-            const data = await res.json();
-            const activeIp = data.active_ip;
-            
-            // Update Active Badge and Rows
-            document.querySelectorAll('tr[id^="row-"]').forEach(row => {
-                const rowIp = row.id.replace('row-', '').replace(/-/g, '.');
-                if (rowIp === activeIp) {
-                    row.classList.add('row-active');
-                    // Add badge if not present
-                    if (!row.querySelector('.badge-blue')) {
-                        const target = row.querySelector('td div');
-                        if (target) {
-                            const badge = document.createElement('span');
-                            badge.className = 'badge badge-blue';
-                            badge.dataset.i18n = 'status_active';
-                            badge.textContent = 'ACTIVE';
-                            target.appendChild(badge);
-                        }
-                    }
-                } else {
-                    row.classList.remove('row-active');
-                    const badge = row.querySelector('.badge-blue');
-                    if (badge) badge.remove();
-                }
-            });
-
-            // Update footer total if exists
-            const activeDisplay = document.querySelector('.text-accent');
-            if (activeDisplay && activeDisplay.innerText.includes('Relay')) {
-                activeDisplay.textContent = activeIp || 'None';
-            }
-
-        } catch(e) { console.error("Poll failed", e); }
-    }
-    setInterval(pollStatus, 5000);
+    document.addEventListener('DOMContentLoaded', () => {
+        syncStatusPoll();
+        refreshAllStatuses();
+    });
 </script>
 {% endblock %}

@@ -160,21 +160,32 @@ def auto_check_all():
     write_json(LAST_CHECK_FILE, last_check_data)
     
     config = read_json(RELAY_IPS_FILE, {"ips": []})
+    ips_to_check = [ip_data for ip_data in config.get("ips", []) 
+                    if ip_data.get("enabled", True) or ip_data.get("blacklist_status") == "BLACKLISTED"]
+    
+    total_to_check = len(ips_to_check)
     blacklisted_count = 0
     checked_count = 0
     
-    for ip_data in config.get("ips", []):
+    for ip_data in ips_to_check:
         ip = ip_data.get("ip")
         if not ip: continue
-        if ip_data.get("enabled", True) or ip_data.get("blacklist_status") == "BLACKLISTED":
-            try:
-                res = process_ip_blacklist_alert(ip)
-                checked_count += 1
-                if res.get("is_blacklisted"):
-                    blacklisted_count += 1
-            except Exception as e:
-                print(f"[Blacklist] Error checking IP {ip}: {e}")
-            time.sleep(1) # Small delay
+        
+        # Update progress in status file
+        last_check_data["current_ip"] = ip
+        last_check_data["progress"] = f"{checked_count}/{total_to_check}"
+        write_json(LAST_CHECK_FILE, last_check_data)
+        
+        try:
+            res = process_ip_blacklist_alert(ip)
+            checked_count += 1
+            if res.get("is_blacklisted"):
+                blacklisted_count += 1
+        except Exception as e:
+            print(f"[Blacklist] Error checking IP {ip}: {e}")
+        
+        if checked_count < total_to_check:
+            time.sleep(1.5) # Slightly longer delay to be nice to API
             
     summary = {
         "last_check": time.time(),
