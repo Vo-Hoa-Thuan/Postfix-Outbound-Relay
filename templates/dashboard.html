@@ -343,8 +343,8 @@
     }
 
     setInterval(() => { if (remainingTime > 0) { remainingTime--; document.getElementById('countdown').textContent = remainingTime + 's'; } }, 1000);
-    setInterval(pollStatus, 1500);
-    setInterval(refreshLogs, 10000);
+    setInterval(pollStatus, 1500); // 1.5s is fine for simple system status
+    setInterval(refreshLogs, 3000); // 3s for fast UI updates
 
     document.addEventListener("DOMContentLoaded", () => {
         refreshLogs();

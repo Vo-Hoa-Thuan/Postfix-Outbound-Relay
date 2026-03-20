@@ -73,8 +73,8 @@ async def _background_tasks():
             # 2. Blacklist Check (Has internal throttling/interval) - VERY SLOW
             await loop.run_in_executor(None, auto_check_all)
 
-            # 3. Incremental Log Monitoring (Every 10 seconds)
-            if now - last_log_parse > 10:
+            # 3. Incremental Log Monitoring (Every 3 seconds)
+            if now - last_log_parse > 3:
                 await loop.run_in_executor(None, parse_maillog, 5000)
                 last_log_parse = now
                 
