@@ -89,9 +89,10 @@ async def dashboard(request: Request):
         "total_deferred_1h": deferred
     }
 
-    # Fetch unique local IPs for the filter dropdown
-    recent_for_stats = _read_recent_logs(1000)
+    # Fetch unique local IPs and Dates for the filter dropdown
+    recent_for_stats = _read_recent_logs(2000)
     unique_local_ips = sorted(list(set(l.get("local_ip") for l in recent_for_stats if l.get("local_ip"))))
+    unique_dates = sorted(list(set(l.get("time", "")[:10] for l in recent_for_stats if len(l.get("time", "")) >= 10)), reverse=True)
 
     # Top stats logic
     from collections import Counter
@@ -110,6 +111,7 @@ async def dashboard(request: Request):
         "stats":           stats,
         "recent_logs":     recent_for_stats[:50],
         "unique_ips":      unique_local_ips,
+        "unique_dates":    unique_dates,
         "top_senders":     top_senders,
         "top_ips":         top_ips,
         "active_page":     "dashboard"

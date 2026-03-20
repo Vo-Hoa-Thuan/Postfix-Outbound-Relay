@@ -83,14 +83,25 @@
     <div class="ops-card-header" style="padding: 0.5rem 1rem; background: var(--bg-elevated); border-bottom: 2px solid var(--border);">
         <h3 class="ops-card-title" style="font-size: 0.95rem; text-transform: uppercase;"><span>📡 Activity Feed</span></h3>
         <div style="display: flex; gap: 0.5rem; align-items: center;">
-            <div class="filter-group" style="display: flex; gap: 0.5rem;">
-                <input type="date" id="filter-date-top" class="form-input btn-xs" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; height: auto; outline: none; border-radius: 3px; border: 1px solid var(--border); background: var(--bg-base); color: var(--text-primary);" onchange="refreshLogs()">
-                <select id="filter-ip-top" class="form-input btn-xs" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; height: auto; outline: none; border-radius: 3px; border: 1px solid var(--border); background: var(--bg-base); color: var(--text-primary);" onchange="refreshLogs()">
-                    <option value="">-- TẤT CẢ IP --</option>
-                    {% for uip in unique_ips %}
-                    <option value="{{ uip }}">{{ uip }}</option>
-                    {% endfor %}
-                </select>
+            <div class="filter-group" style="display: flex; gap: 1rem; align-items: center;">
+                <div style="display: flex; gap: 0.3rem; align-items: center;">
+                    <span style="font-size: 0.75rem; font-weight: bold; color: var(--text-muted);">LOG</span>
+                    <select id="filter-date-top" class="form-input btn-xs" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; height: auto; outline: none; border-radius: 3px; border: 1px solid var(--border); background: var(--bg-base); color: var(--text-primary); min-width: 120px;" onchange="refreshLogs()">
+                        <option value="">-- TẤT CẢ NGÀY --</option>
+                        {% for udate in unique_dates %}
+                        <option value="{{ udate }}">{{ udate }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div style="display: flex; gap: 0.3rem; align-items: center;">
+                    <span style="font-size: 0.75rem; font-weight: bold; color: var(--text-muted);">IP</span>
+                    <select id="filter-ip-top" class="form-input btn-xs" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; height: auto; outline: none; border-radius: 3px; border: 1px solid var(--border); background: var(--bg-base); color: var(--text-primary); min-width: 120px;" onchange="refreshLogs()">
+                        <option value="">-- TẤT CẢ IP --</option>
+                        {% for uip in unique_ips %}
+                        <option value="{{ uip }}">{{ uip }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
             <button onclick="refreshLogs()" class="btn btn-secondary btn-xs" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; height: auto;">↻ Cập nhật</button>
         </div>
