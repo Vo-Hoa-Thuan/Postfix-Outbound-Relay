@@ -1,0 +1,7 @@
+[dashboard.html] Syntax OK
+[queue.html] Syntax OK
+[rotation_history.html] Syntax OK
+[base.html] Syntax OK
+[ips.html] Syntax OK
+[rspamd.html] Syntax OK
+[settings.html] Syntax OK

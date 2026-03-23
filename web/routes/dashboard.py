@@ -170,9 +170,33 @@ async def api_status():
             "active_ips": len([ip for ip in all_ips if ip.get("enabled", True)]),
             "disabled_ips": len([ip for ip in all_ips if not ip.get("enabled", True)]),
             "blacklisted_ips": len(blacklisted),
-            "queue_size": queue_status.get("active", 0) + queue_status.get("deferred", 0)
+            "queue_size": queue_status.get("active", 0) + queue_status.get("deferred", 0),
+            "queue_breakdown": {
+                "active": queue_status.get("active", 0),
+                "deferred": queue_status.get("deferred", 0),
+                "hold": queue_status.get("hold", 0),
+                "incoming": queue_status.get("incoming", 0)
+            }
         }
     }
+
+@router.get("/queue", response_class=HTMLResponse)
+async def queue_page(request: Request):
+    from core.tracking import get_queue_status
+    status = get_queue_status()
+    return templates.TemplateResponse("queue.html", {
+        "request": request,
+        "queue": status,
+        "active_page": "queue"
+    })
+
+@router.post("/flush")
+async def flush_all_queues():
+    from core.tracking import flush_queue
+    success = flush_queue()
+    if success:
+        return {"success": True}
+    return {"success": False, "error": "Postfix flush failed"}
 
 @router.get("/api/chart")
 async def api_chart():
@@ -181,3 +205,26 @@ async def api_chart():
     if os.path.exists(cache_path):
         return read_json(cache_path, {})
     return {"labels": [], "datasets": {"sent": [], "deferred": [], "bounced": []}}
+
+@router.get("/api/rotation-history")
+async def api_rotation_history(limit: int = 20):
+    """Returns the latest IP rotation events."""
+    rotation_log = os.path.join(BASE_DIR, "logs", "rotation.log")
+    if not os.path.exists(rotation_log):
+        return []
+    
+    events = []
+    try:
+        with open(rotation_log, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+            for line in reversed(lines):
+                line = line.strip()
+                if not line: continue
+                try:
+                    events.append(json.loads(line))
+                    if len(events) >= limit: break
+                except: continue
+    except Exception as e:
+        print(f"[Dashboard] Rotation history error: {e}")
+    
+    return events

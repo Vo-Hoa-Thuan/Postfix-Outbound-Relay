@@ -7,6 +7,7 @@ and initialises default config/runtime files on first run.
 import os
 import sys
 import time
+import asyncio
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -112,9 +113,11 @@ async def _init_defaults():
 
     # Ensure logs/parsed.log exists
     parsed_log = os.path.join(BASE_DIR, "logs", "parsed.log")
-    if not os.path.exists(parsed_log):
-        os.makedirs(os.path.dirname(parsed_log), exist_ok=True)
-        open(parsed_log, "w").close()
+    rotation_log = os.path.join(BASE_DIR, "logs", "rotation.log")
+    for log_path in [parsed_log, rotation_log]:
+        if not os.path.exists(log_path):
+            os.makedirs(os.path.dirname(log_path), exist_ok=True)
+            open(log_path, "w").close()
 
     print("[RelayPanel] Startup complete - all config files verified.")
     loop = asyncio.get_event_loop()

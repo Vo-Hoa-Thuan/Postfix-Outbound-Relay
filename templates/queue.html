@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% set active_page = "queue" %}
+
+{% block title %}Queue Manager – Postfix Relay Panel{% endblock %}
+
+{% block content %}
+<div class="section-header">
+    <div>
+        <h2 style="color: var(--accent); font-size: 1.2rem; letter-spacing: 0.1em; text-transform: uppercase;">📊 Queue Manager</h2>
+        <p class="text-muted small">Monitor and manage the Postfix outbound mail queue</p>
+    </div>
+    <div style="display: flex; gap: 1rem;">
+        <button onclick="flushQueue()" id="flushBtn" class="btn btn-primary">⚡ Flush All Queues</button>
+        <button onclick="location.reload()" class="btn btn-secondary">↻ Refresh Status</button>
+    </div>
+</div>
+
+<div class="dashboard-grid mt-4" style="grid-template-columns: repeat(4, 1fr); gap: 1.5rem;">
+    <div class="ops-card" style="border-top: 4px solid var(--green);">
+        <div class="ops-card-body" style="text-align: center; padding: 1.5rem;">
+            <div class="text-muted small uppercase bold">Active</div>
+            <div style="font-size: 2.5rem; font-weight: 800; font-family: var(--ff-mono); color: var(--green);">{{ queue.active }}</div>
+            <div class="small text-muted">Messages in delivery</div>
+        </div>
+    </div>
+    <div class="ops-card" style="border-top: 4px solid var(--yellow);">
+        <div class="ops-card-body" style="text-align: center; padding: 1.5rem;">
+            <div class="text-muted small uppercase bold">Deferred</div>
+            <div style="font-size: 2.5rem; font-weight: 800; font-family: var(--ff-mono); color: var(--yellow);">{{ queue.deferred }}</div>
+            <div class="small text-muted">Delayed/Retrying</div>
+        </div>
+    </div>
+    <div class="ops-card" style="border-top: 4px solid var(--red);">
+        <div class="ops-card-body" style="text-align: center; padding: 1.5rem;">
+            <div class="text-muted small uppercase bold">Hold</div>
+            <div style="font-size: 2.5rem; font-weight: 800; font-family: var(--ff-mono); color: var(--red);">{{ queue.hold }}</div>
+            <div class="small text-muted">Administratively frozen</div>
+        </div>
+    </div>
+    <div class="ops-card" style="border-top: 4px solid var(--blue);">
+        <div class="ops-card-body" style="text-align: center; padding: 1.5rem;">
+            <div class="text-muted small uppercase bold">Incoming</div>
+            <div style="font-size: 2.5rem; font-weight: 800; font-family: var(--ff-mono); color: var(--blue);">{{ queue.incoming }}</div>
+            <div class="small text-muted">Awaiting processing</div>
+        </div>
+    </div>
+</div>
+
+<div class="ops-card mt-4">
+    <div class="ops-card-header">
+        <h3 class="ops-card-title">Queue Summary</h3>
+    </div>
+    <div class="ops-card-body">
+        <div class="mono small" style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 4px; border: 1px solid var(--border);">
+            {{ queue.summary }}
+        </div>
+        <p class="text-muted small mt-2">
+            Tip: Postfix automatically retries deferred messages based on the schedule set in main.cf.
+        </p>
+    </div>
+</div>
+
+<script>
+async function flushQueue() {
+    if (!confirm("Are you sure you want to force all deferred messages to be retried immediately?")) return;
+    const btn = document.getElementById('flushBtn');
+    btn.disabled = true;
+    btn.textContent = "Flushing...";
+    try {
+        const res = await fetch('/flush', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            alert("Queue flush triggered successfully.");
+            location.reload();
+        } else {
+            alert("Error: " + data.error);
+        }
+    } catch(e) {
+        alert("Failed to communicate with server.");
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "⚡ Flush All Queues";
+    }
+}
+</script>
+{% endblock %}

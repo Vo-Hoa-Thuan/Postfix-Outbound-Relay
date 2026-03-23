@@ -21,7 +21,8 @@ RE_SMTP = re.compile(
     r"(?P<month>\w+)\s+(?P<day>\d+)\s+(?P<time>\d+:\d+:\d+)"
     r".*?postfix/([^/]+/)?(smtp|lmtp|local|virtual|pipe)\[\d+\]:\s+(?P<qid>\w+):\s+"
     r"to=<(?P<to>[^>]+)>.*?"
-    r"status=(?P<status>\w+)"
+    r"(?:delay=(?P<delay>[\d\.]+),\s+delays=(?P<delays>[\d\./]+),\s+.*?)?"
+    r"status=(?P<status>\w+)(?:\s+\((?P<resp>.*?)\))?"
 )
 
 RE_REJECT = re.compile(
@@ -33,16 +34,22 @@ RE_REJECT = re.compile(
 
 # QID to metadata lookup (for Postfix)
 RE_QID_FROM = re.compile(
-    r"postfix/([^/]+/)?(smtpd|qmgr|cleanup)\[\d+\]:\s+(?P<qid>\w+):.*?from=<(?P<from>[^>]+)>"
+    r"postfix/([^/]+/)?(smtpd|qmgr|cleanup)\[\d+\]:\s+(?P<qid>\w+):.*?from=<(?P<from>[^>]+)>.*?(?:size=(?P<size>\d+))?"
 )
 RE_QID_SUBJECT = re.compile(
     r"postfix/([^/]+/)?cleanup\[\d+\]:\s+(?P<qid>\w+):.*?header Subject:\s+(?P<subject>.*?)(?=\s+from\s+[^;]+;|\s+from=|\s+proto=|\s+helo=|$)"
 )
 RE_QID_CLIENT = re.compile(
-    r"postfix/([^/]+/)?smtpd\[\d+\]:\s+(?P<qid>\w+):.*?client=[^\[]+\[(?P<ip>\d+\.\d+\.\d+\.\d+)\]"
+    r"postfix/([^/]+/)?smtpd\[\d+\]:\s+(?P<qid>\w+):.*?client=[^\[]+\[(?P<ip>\d+\.\d+\.\d+\.\d+)\](?:.*?(?:sasl_username=(?P<sasl>[^,\s]+)))?"
 )
 RE_QID_ERROR = re.compile(
     r"postfix/([^/]+)\[\d+\]:\s+(?P<qid>\w+):\s+(?P<level>fatal|error|warning):\s+(?P<msg>.*)"
+)
+RE_QID_RSPAMD = re.compile(
+    r"postfix/(smtpd|cleanup)\[\d+\]:\s+(?P<qid>\w+):.*?milter-(reject|keep|accept|discard):.*?score=(?P<score>[\d\.-]+)\s+symbols=(?P<symbols>.*)"
+)
+RE_QID_TLS = re.compile(
+    r"postfix/([^/]+/)?smtp\[\d+\]:\s+(?P<qid>\w+):.*?(?:Untrusted|Trusted|Verified|Anonymous)?\s*TLS connection established to .*?:\s+(?P<tls_ver>[A-Za-z0-9\.]+)\s+with cipher\s+(?P<cipher>[A-Za-z0-9_\-]+)"
 )
 
 # Extra fields lookup
@@ -173,6 +180,7 @@ def _parse_journal_incremental(state: dict) -> None:
                     if qid not in state["qid_map"]: state["qid_map"][qid] = {}
                     if isinstance(state["qid_map"][qid], str): state["qid_map"][qid] = {"from": state["qid_map"][qid]}
                     state["qid_map"][qid]["from"] = mq_from.group("from")
+                    if mq_from.group("size"): state["qid_map"][qid]["size"] = mq_from.group("size")
                 
                 mq_subj = RE_QID_SUBJECT.search(full_line)
                 if mq_subj:
@@ -187,6 +195,15 @@ def _parse_journal_incremental(state: dict) -> None:
                     if qid not in state["qid_map"]: state["qid_map"][qid] = {}
                     if isinstance(state["qid_map"][qid], str): state["qid_map"][qid] = {"from": state["qid_map"][qid]}
                     state["qid_map"][qid]["client"] = mq_client.group("ip")
+                    if mq_client.group("sasl"): state["qid_map"][qid]["sasl"] = mq_client.group("sasl")
+
+                mq_tls = RE_QID_TLS.search(full_line)
+                if mq_tls:
+                    qid = mq_tls.group("qid")
+                    if qid not in state["qid_map"]: state["qid_map"][qid] = {}
+                    if isinstance(state["qid_map"][qid], str): state["qid_map"][qid] = {"from": state["qid_map"][qid]}
+                    state["qid_map"][qid]["tls_ver"] = mq_tls.group("tls_ver")
+                    state["qid_map"][qid]["cipher"] = mq_tls.group("cipher")
 
                 mq_error = RE_QID_ERROR.search(full_line)
                 if mq_error:
@@ -194,6 +211,14 @@ def _parse_journal_incremental(state: dict) -> None:
                     if qid not in state["qid_map"]: state["qid_map"][qid] = {}
                     if isinstance(state["qid_map"][qid], str): state["qid_map"][qid] = {"from": state["qid_map"][qid]}
                     state["qid_map"][qid]["error"] = mq_error.group("msg").strip()
+                
+                mq_rspamd = RE_QID_RSPAMD.search(full_line)
+                if mq_rspamd:
+                    qid = mq_rspamd.group("qid")
+                    if qid not in state["qid_map"]: state["qid_map"][qid] = {}
+                    if isinstance(state["qid_map"][qid], str): state["qid_map"][qid] = {"from": state["qid_map"][qid]}
+                    state["qid_map"][qid]["spam_score"] = float(mq_rspamd.group("score"))
+                    state["qid_map"][qid]["spam_symbols"] = mq_rspamd.group("symbols").strip()
                     
                 entry = _parse_line(full_line, state["qid_map"])
                 if entry:
@@ -238,6 +263,7 @@ def _parse_files(target_logs: list, limit_per_file: int, state: dict) -> None:
                         if qid not in state["qid_map"]: state["qid_map"][qid] = {}
                         if isinstance(state["qid_map"][qid], str): state["qid_map"][qid] = {"from": state["qid_map"][qid]}
                         state["qid_map"][qid]["from"] = mq_from.group("from")
+                        if mq_from.group("size"): state["qid_map"][qid]["size"] = mq_from.group("size")
                     
                     mq_subj = RE_QID_SUBJECT.search(line)
                     if mq_subj:
@@ -252,6 +278,30 @@ def _parse_files(target_logs: list, limit_per_file: int, state: dict) -> None:
                         if qid not in state["qid_map"]: state["qid_map"][qid] = {}
                         if isinstance(state["qid_map"][qid], str): state["qid_map"][qid] = {"from": state["qid_map"][qid]}
                         state["qid_map"][qid]["client"] = mq_client.group("ip")
+                        if mq_client.group("sasl"): state["qid_map"][qid]["sasl"] = mq_client.group("sasl")
+
+                    mq_tls = RE_QID_TLS.search(line)
+                    if mq_tls:
+                        qid = mq_tls.group("qid")
+                        if qid not in state["qid_map"]: state["qid_map"][qid] = {}
+                        if isinstance(state["qid_map"][qid], str): state["qid_map"][qid] = {"from": state["qid_map"][qid]}
+                        state["qid_map"][qid]["tls_ver"] = mq_tls.group("tls_ver")
+                        state["qid_map"][qid]["cipher"] = mq_tls.group("cipher")
+
+                    mq_error = RE_QID_ERROR.search(line)
+                    if mq_error:
+                        qid = mq_error.group("qid")
+                        if qid not in state["qid_map"]: state["qid_map"][qid] = {}
+                        if isinstance(state["qid_map"][qid], str): state["qid_map"][qid] = {"from": state["qid_map"][qid]}
+                        state["qid_map"][qid]["error"] = mq_error.group("msg").strip()
+
+                    mq_rspamd = RE_QID_RSPAMD.search(line)
+                    if mq_rspamd:
+                        qid = mq_rspamd.group("qid")
+                        if qid not in state["qid_map"]: state["qid_map"][qid] = {}
+                        if isinstance(state["qid_map"][qid], str): state["qid_map"][qid] = {"from": state["qid_map"][qid]}
+                        state["qid_map"][qid]["spam_score"] = float(mq_rspamd.group("score"))
+                        state["qid_map"][qid]["spam_symbols"] = mq_rspamd.group("symbols").strip()
                     
                     entry = _parse_line(line, state["qid_map"])
                     if entry: entries.append(entry)
@@ -266,32 +316,57 @@ def _parse_files(target_logs: list, limit_per_file: int, state: dict) -> None:
 
 def _parse_line(line: str, qid_map: Dict[str, str]) -> Optional[dict]:
     # Postfix SMTP
-    m_smtp = RE_SMTP.search(line)
-    if m_smtp:
-        qid = m_smtp.group("qid")
+    match_smtp = RE_SMTP.search(line)
+    if match_smtp:
+        s_dict = match_smtp.groupdict()
+        time_str = _parse_timestamp(s_dict['month'], s_dict['day'], s_dict['time'])
+        qid = s_dict["qid"]
+        dest = s_dict["to"]
+        status = s_dict["status"]
+        resp = s_dict.get("resp") or ""
+        delay = s_dict.get("delay")
+        delays = s_dict.get("delays")
+        
         qid_info = qid_map.get(qid, {})
-        # Compatibility with old string-based qid_map
-        msg_from = qid_info if isinstance(qid_info, str) else qid_info.get("from", "-")
-        msg_subj = qid_info.get("subject", "-") if isinstance(qid_info, dict) else "-"
-        client_ip = qid_info.get("client", "") if isinstance(qid_info, dict) else ""
+        caller_from = qid_info if isinstance(qid_info, str) else qid_info.get("from", "unknown")
+        subj = qid_info.get("subject", "") if isinstance(qid_info, dict) else ""
+        client = qid_info.get("client", "") if isinstance(qid_info, dict) else ""
+        sasl = qid_info.get("sasl", "") if isinstance(qid_info, dict) else ""
+        error_msg = qid_info.get("error", "") if isinstance(qid_info, dict) else ""
+        spam_score = qid_info.get("spam_score", None) if isinstance(qid_info, dict) else None
+        spam_symbols = qid_info.get("spam_symbols", "") if isinstance(qid_info, dict) else ""
+        msg_size = qid_info.get("size", None) if isinstance(qid_info, dict) else None
+        tls_ver = qid_info.get("tls_ver", None) if isinstance(qid_info, dict) else None
+        cipher = qid_info.get("cipher", None) if isinstance(qid_info, dict) else None
         
+        # Postfix relays log IP in output. Or we match RE_RELAY_IP.
+        dest_ip = ""
+        if resp:
+            rip_m = RE_RELAY_IP.search("relay=" + resp if "relay=" not in resp else resp)
+            if rip_m: dest_ip = rip_m.group("ip")
+            
         entry = {
-            "time":     _parse_timestamp(m_smtp.group("month"), m_smtp.group("day"), m_smtp.group("time")),
-            "qid":      qid,
-            "from":     msg_from,
-            "to":       m_smtp.group("to"),
-            "subject":  msg_subj,
-            "local_ip":  client_ip,
-            "dest_ip":   "",
-            "status":   m_smtp.group("status").lower(),
-            "error_msg": qid_info.get("error") if isinstance(qid_info, dict) else None
+            "time": time_str,
+            "msgid": "", # Hard to get from syslog reliably without another regex
+            "qid": qid,
+            "from": caller_from,
+            "to": dest,
+            "subject": subj,
+            "status": status,
+            "response": resp,
+            "local_ip": "", # Usually postfix doesn't explicitly log local IP bound unless detailed postfix logging is on
+            "dest_ip": dest_ip,
+            "client_ip": client,
+            "sasl": sasl,
+            "error_msg": error_msg,
+            "spam_score": spam_score,
+            "spam_symbols": spam_symbols,
+            "delay": delay,
+            "delays": delays,
+            "size": msg_size,
+            "tls_ver": tls_ver,
+            "cipher": cipher
         }
-        rip = RE_RELAY_IP.search(line); 
-        if rip: entry["dest_ip"] = rip.group("ip")
-        
-        # Subject is rarely in smtp line, but check just in case
-        sm = RE_SUBJ.search(line); 
-        if sm: entry["subject"] = sm.group(1).strip()
         return entry
 
     # Postfix QID Error (Catching fatal/warning lines)

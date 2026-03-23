@@ -11,6 +11,10 @@ const translations = {
         "nav_logs": "SMTP Monitor",
         "nav_diag": "Chẩn đoán",
         "nav_settings": "Cài đặt",
+        "nav_network": "Mạng & IP",
+        "nav_system": "Hệ thống",
+        "nav_queue": "Quản lý Hàng đợi",
+        "nav_rot_history": "Lịch sử Xoay IP",
         
         "ttl_dashboard": "Trung tâm Điều hành Mail Relay",
         "ttl_status": "Trạng thái hệ thống",
@@ -253,6 +257,10 @@ const translations = {
         "nav_logs": "SMTP Monitor",
         "nav_diag": "Diagnostics",
         "nav_settings": "Settings",
+        "nav_network": "Network & IP",
+        "nav_system": "System",
+        "nav_queue": "Queue Manager",
+        "nav_rot_history": "Rotation History",
         
         "ttl_dashboard": "Mail Relay Operations Console",
         "ttl_status": "System Status",

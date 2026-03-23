@@ -6,41 +6,41 @@
 {% block content %}
 <!-- ── Operations Header Strip ──────────────────────────────────────── -->
 <!-- ── Operations Header Strip (Ultra Compact) ──────────────────────────────────────── -->
-<div class="ops-compact-header">
-    <div class="stat-item {% if postfix_status == 'running' %}good{% else %}crit{% endif %}">
-        <span class="lbl" data-i18n="lbl_postfix">Hệ thống: Postfix</span>
-        <span class="val" id="stat-postfix">{{ postfix_status | upper }}</span>
+<div class="ops-compact-header" style="gap: 0.5rem; padding: 0.3rem 0.8rem; margin: -1rem -1.5rem 0.5rem -1.5rem; font-size: 0.75rem;">
+    <div class="stat-item {% if postfix_status == 'running' %}good{% else %}crit{% endif %}" style="padding: 0.1rem 0.3rem;">
+        <span class="lbl" style="font-size: 0.65rem;">POSTFIX</span>
+        <span class="val" id="stat-postfix" style="font-size: 0.75rem;">{{ postfix_status | upper }}</span>
     </div>
-    <div class="stat-item {% if rspamd_status == 'running' %}good{% else %}crit{% endif %}">
-        <span class="lbl" data-i18n="lbl_rspamd">Hệ thống: Rspamd</span>
-        <span class="val" id="stat-rspamd">{{ rspamd_status | upper }}</span>
+    <div class="stat-item {% if rspamd_status == 'running' %}good{% else %}crit{% endif %}" style="padding: 0.1rem 0.3rem;">
+        <span class="lbl" style="font-size: 0.65rem;">RSPAMD</span>
+        <span class="val" id="stat-rspamd" style="font-size: 0.75rem;">{{ rspamd_status | upper }}</span>
     </div>
-    <div class="stat-item good">
-        <span class="lbl" data-i18n="lbl_active_ips">Active IPs</span>
-        <span class="val" id="stat-active-ips">{{ stats.active_ips }}</span>
+    <div class="stat-item good" style="padding: 0.1rem 0.3rem;">
+        <span class="lbl" style="font-size: 0.65rem;">ACTIVE IPs</span>
+        <span class="val" id="stat-active-ips" style="font-size: 0.75rem;">{{ stats.active_ips }}</span>
     </div>
-    <div class="stat-item {% if stats.blacklisted_ips > 0 %}crit{% else %}good{% endif %}">
-        <span class="lbl" data-i18n="lbl_blacklisted_ips">Blacklisted</span>
-        <span class="val" id="stat-blacklisted-ips">{{ stats.blacklisted_ips }}</span>
+    <div class="stat-item {% if stats.blacklisted_ips > 0 %}crit{% else %}good{% endif %}" style="padding: 0.1rem 0.3rem;">
+        <span class="lbl" style="font-size: 0.65rem;">BLACKLISTED</span>
+        <span class="val" id="stat-blacklisted-ips" style="font-size: 0.75rem;">{{ stats.blacklisted_ips }}</span>
     </div>
-    <div class="stat-item good">
-        <span class="lbl" data-i18n="lbl_queue_size">Queue Size</span>
-        <span class="val" id="stat-queue-size">{{ stats.queue_size }}</span>
+    <div class="stat-item good" style="padding: 0.1rem 0.3rem;">
+        <span class="lbl" style="font-size: 0.65rem;">QUEUE (A|D|H)</span>
+        <span class="val" id="stat-queue-size" style="font-size: 0.75rem;">{{ stats.queue_size }}</span>
     </div>
-    <div class="stat-item good">
-        <span class="lbl" data-i18n="lbl_sent_1h">Sent (1h)</span>
-        <span class="val" id="stat-sent-1h">{{ stats.total_sent_1h }}</span>
+    <div class="stat-item good" style="padding: 0.1rem 0.3rem;">
+        <span class="lbl" style="font-size: 0.65rem;">SENT(1H)</span>
+        <span class="val" id="stat-sent-1h" style="font-size: 0.75rem;">{{ stats.total_sent_1h }}</span>
     </div>
-    <div class="stat-item good">
-        <span class="lbl" data-i18n="lbl_rot_trigger">Xoay IP: Đếm ngược</span>
-        <span class="val" id="countdown">{{ time_remaining }}s</span>
+    <div class="stat-item good" style="padding: 0.1rem 0.3rem;">
+        <span class="lbl" style="font-size: 0.65rem;">XOAY IP</span>
+        <span class="val" id="countdown" style="font-size: 0.75rem;">{{ time_remaining }}s</span>
     </div>
     
-    <div class="stat-actions" style="margin-left: auto; display: flex; gap: 0.5rem; align-items: center;">
-        <span class="lbl" style="font-size: 0.75rem; color: var(--text-muted);">IP H/T:</span>
-        <span class="val mono" id="stat-current-ip" style="font-weight: 700;">{{ active_ip }}</span>
-        <form onsubmit="handleRotate(event)" style="display: inline; margin-left: 0.5rem;">
-            <button type="submit" id="rotateBtn" class="btn btn-primary btn-xs" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">⟳ Rotate</button>
+    <div class="stat-actions" style="margin-left: auto; display: flex; gap: 0.3rem; align-items: center;">
+        <span class="lbl" style="font-size: 0.65rem; color: var(--text-muted);">IP H/T:</span>
+        <span class="val mono" id="stat-current-ip" style="font-weight: 700; font-size: 0.75rem; color: var(--accent);">{{ active_ip }}</span>
+        <form onsubmit="handleRotate(event)" style="display: inline; margin-left: 0.2rem;">
+            <button type="submit" id="rotateBtn" class="btn btn-primary btn-xs" style="padding: 0.15rem 0.4rem; font-size: 0.7rem;">⟳ Rotate</button>
         </form>
     </div>
 </div>
@@ -112,11 +112,13 @@
                 <tr>
                     <th style="width: 140px; cursor: pointer;" onclick="sortTable(0)">TIME ↕</th>
                     <th style="width: 130px; cursor: pointer;" onclick="sortTable(1)">LOCAL IP ↕</th>
+                    <th style="width: 130px; cursor: pointer;" onclick="sortTable(1)">LOCAL IP ↕</th>
                     <th style="width: 130px; cursor: pointer;" onclick="sortTable(2)">DEST IP ↕</th>
                     <th style="width: 200px;">FROM</th>
                     <th style="width: 200px;">TO</th>
                     <th>SUBJECT</th>
-                    <th style="width: 110px; cursor: pointer;" onclick="sortTable(6)">STATUS ↕</th>
+                    <th style="width: 80px; cursor: pointer;" onclick="sortTable(6)">SCORE ↕</th>
+                    <th style="width: 110px; cursor: pointer;" onclick="sortTable(7)">STATUS ↕</th>
                 </tr>
                 <tr class="inline-filter-row">
                     <td></td>
@@ -125,6 +127,7 @@
                     <td><input type="text" id="fltFrom" placeholder="Filter From" onkeyup="filterTableInline()"></td>
                     <td><input type="text" id="fltTo" placeholder="Filter To" onkeyup="filterTableInline()"></td>
                     <td><input type="text" id="fltSubject" placeholder="Filter Subject" onkeyup="filterTableInline()"></td>
+                    <td></td>
                     <td></td>
                 </tr>
             </thead>
@@ -138,22 +141,59 @@
                     <td class="addr-cell"><div class="ellipsis">{{ log.from }}</div></td>
                     <td class="addr-cell"><div class="ellipsis">{{ log.to }}</div></td>
                     <td class="addr-cell"><div class="ellipsis">{{ log.subject or '—' }}</div></td>
+                    <td>
+                        {% if log.get('spam_score') is not none %}
+                        <span class="mono bold {% if log.get('spam_score') > 5 %}text-danger{% elif log.get('spam_score') > 2 %}text-yellow{% else %}text-green{% endif %}" style="font-size: 0.85rem;">
+                            {{ "%.1f" | format(log.get('spam_score')) }}
+                        </span>
+                        {% else %}—{% endif %}
+                    </td>
                     <td><span class="ops-badge ops-badge-{% if status_lower == 'sent' %}successful{% else %}{{ status_lower }}{% endif %}">{{ 'SUCCESSFUL' if status_lower == 'sent' else (log.status | upper) }}</span></td>
                 </tr>
                 <tr class="log-detail" style="display: none; background: rgba(0,0,0,0.1);">
-                    <td colspan="7" style="padding: 1rem; border-left: 3px solid var(--accent);">
-                        <div style="display: flex; gap: 2rem;">
+                    <td colspan="8" style="padding: 1rem; border-left: 3px solid var(--accent);">
+                        <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
                             <div style="min-width: 200px;">
                                 <div class="text-muted small uppercase" style="font-weight: 700;">Context</div>
-                                <div class="mono small">ID: {{ log.msgid or '—' }}</div>
-                                <div class="mono small">QID: {{ log.qid or '—' }}</div>
-                                {% if log.error_msg %}
-                                <div style="margin-top: 0.5rem; color: var(--red); font-weight: bold; font-size: 0.75rem;">⚠️ ERROR: {{ log.error_msg }}</div>
+                                <div class="mono small">ID: {{ log.get('msgid') or '—' }}</div>
+                                <div class="mono small">QID: {{ log.get('qid') or '—' }}</div>
+                                {% if log.get('size') %}<div class="mono small">Size: {{ log.get('size') }} B</div>{% endif %}
+                                {% if log.get('client_ip') %}
+                                <div class="text-muted small uppercase" style="font-weight: 700; margin-top: 0.5rem;">Client Auth</div>
+                                <div class="mono small">IP: {{ log.get('client_ip') }}</div>
+                                {% if log.get('sasl') %}<div class="mono small">User: {{ log.get('sasl') }}</div>{% endif %}
+                                {% endif %}
+                                {% if log.get('error_msg') %}
+                                <div style="margin-top: 0.5rem; color: var(--red); font-weight: bold; font-size: 0.75rem;">⚠️ ERROR: {{ log.get('error_msg') }}</div>
                                 {% endif %}
                             </div>
-                            <div style="flex: 1;">
+                            <div style="min-width: 250px;">
+                                <div class="text-muted small uppercase" style="font-weight: 700;">Security (TLS & Spam)</div>
+                                {% if log.get('tls_ver') %}
+                                <div class="small mb-1">
+                                    <span class="ops-badge ops-badge-info" style="font-size: 0.65rem; padding: 0.1rem 0.3rem;">{{ log.get('tls_ver') }}</span>
+                                    <span class="mono text-muted" style="font-size: 0.75rem;">{{ log.get('cipher') }}</span>
+                                </div>
+                                {% else %}
+                                <div class="small text-muted mb-1" style="font-style: italic;">No TLS info</div>
+                                {% endif %}
+                                {% if log.get('spam_symbols') %}
+                                <div style="margin-top: 0.5rem;">
+                                    <div class="text-muted small uppercase" style="font-weight: 700;">Symbols</div>
+                                    <div class="small text-accent mono" style="word-break: break-all; opacity: 0.8;">{{ log.get('spam_symbols') }}</div>
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div style="flex: 1; min-width: 300px;">
+                                <div class="text-muted small uppercase" style="font-weight: 700;">Delivery & Delays</div>
+                                {% if log.get('delay') %}
+                                <div class="small mb-2">
+                                    <span class="bold">Total Delay:</span> {{ log.get('delay') }}s 
+                                    <span class="text-muted mono" style="margin-left: 0.5rem;">({{ log.get('delays') or '?' }})</span>
+                                </div>
+                                {% endif %}
                                 <div class="text-muted small uppercase" style="font-weight: 700;">Response</div>
-                                <div class="small" style="line-height: 1.2;">{{ log.response or log.reason or '—' }}</div>
+                                <div class="small" style="line-height: 1.2;">{{ log.get('response') or log.get('reason') or '—' }}</div>
                             </div>
                         </div>
                     </td>
@@ -196,7 +236,12 @@
 
                 if (document.getElementById('stat-active-ips')) document.getElementById('stat-active-ips').textContent = data.stats?.active_ips || 0;
                 if (document.getElementById('stat-blacklisted-ips')) document.getElementById('stat-blacklisted-ips').textContent = data.stats?.blacklisted_ips || 0;
-                if (document.getElementById('stat-queue-size')) document.getElementById('stat-queue-size').textContent = data.stats?.queue_size || 0;
+                if (document.getElementById('stat-queue-size')) {
+                    const q = data.stats?.queue_breakdown || {};
+                    document.getElementById('stat-queue-size').innerHTML = `
+                        <span title="Active" class="text-green">${q.active || 0}</span><span style="opacity:0.3">|</span><span title="Deferred" class="text-yellow">${q.deferred || 0}</span><span style="opacity:0.3">|</span><span title="Hold" class="text-danger">${q.hold || 0}</span>
+                    `;
+                }
                 if (document.getElementById('stat-sent-1h')) document.getElementById('stat-sent-1h').textContent = data.total_sent || 0;
 
                 const blVal = document.getElementById('stat-blacklisted-ips');
@@ -258,19 +303,50 @@
                     <td class="addr-cell"><div class="ellipsis">${log.from}</div></td>
                     <td class="addr-cell"><div class="ellipsis">${log.to}</div></td>
                     <td class="addr-cell"><div class="ellipsis">${log.subject || '—'}</div></td>
+                    <td>
+                        ${log.spam_score !== null && log.spam_score !== undefined ? 
+                            `<span class="mono bold ${log.spam_score > 5 ? 'text-danger' : log.spam_score > 2 ? 'text-yellow' : 'text-green'}" style="font-size: 0.85rem;">${parseFloat(log.spam_score).toFixed(1)}</span>` 
+                            : '—'}
+                    </td>
                     <td><span class="ops-badge ops-badge-${badgeCls}">${badgeTxt}</span></td>
                 </tr>
                 <tr class="log-detail" style="display: none; background: rgba(0,0,0,0.1);">
-                    <td colspan="7" style="padding: 1rem; border-left: 3px solid var(--accent);">
-                        <div style="display: flex; gap: 2rem;">
+                    <td colspan="8" style="padding: 1rem; border-left: 3px solid var(--accent);">
+                        <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
                             <div style="min-width: 200px;">
                                 <div class="text-muted small uppercase" style="font-weight: 700;">Context</div>
                                 <div class="mono small">ID: ${log.msgid || '—'}</div>
                                 <div class="mono small">QID: ${log.qid || '—'}</div>
+                                ${log.size ? `<div class="mono small">Size: ${log.size} B</div>` : ''}
+                                ${log.client_ip ? `
+                                <div class="text-muted small uppercase" style="font-weight: 700; margin-top: 0.5rem;">Client Auth</div>
+                                <div class="mono small">IP: ${log.client_ip}</div>
+                                ${log.sasl ? '<div class="mono small">User: ' + log.sasl + '</div>' : ''}
+                                ` : ''}
+                                ${log.error_msg ? `<div style="margin-top: 0.5rem; color: var(--red); font-weight: bold; font-size: 0.75rem;">⚠️ ERROR: ${log.error_msg}</div>` : ''}
                             </div>
-                            <div style="flex: 1;">
+                            <div style="min-width: 250px;">
+                                <div class="text-muted small uppercase" style="font-weight: 700;">Security (TLS & Spam)</div>
+                                ${log.tls_ver ? `
+                                <div class="small mb-1">
+                                    <span class="ops-badge ops-badge-info" style="font-size: 0.65rem; padding: 0.1rem 0.3rem;">${log.tls_ver}</span>
+                                    <span class="mono text-muted" style="font-size: 0.75rem;">${log.cipher}</span>
+                                </div>` : '<div class="small text-muted mb-1" style="font-style: italic;">No TLS info</div>'}
+                                ${log.spam_symbols ? `
+                                <div style="margin-top: 0.5rem;">
+                                    <div class="text-muted small uppercase" style="font-weight: 700;">Symbols</div>
+                                    <div class="small text-accent mono" style="word-break: break-all; opacity: 0.8;">${log.spam_symbols}</div>
+                                </div>` : ''}
+                            </div>
+                            <div style="flex: 1; min-width: 300px;">
+                                <div class="text-muted small uppercase" style="font-weight: 700;">Delivery & Delays</div>
+                                ${log.delay ? `
+                                <div class="small mb-2">
+                                    <span class="bold">Total Delay:</span> ${log.delay}s 
+                                    <span class="text-muted mono" style="margin-left: 0.5rem;">(${log.delays || '?'})</span>
+                                </div>` : ''}
                                 <div class="text-muted small uppercase" style="font-weight: 700;">Response</div>
-                                <div class="small" style="line-height: 1.2;">${log.response || log.reason || '—'}</div>
+                                <div class="small" style="line-height: 1.2; word-break: break-all;">${log.response || log.reason || '—'}</div>
                             </div>
                         </div>
                     </td>
@@ -421,5 +497,11 @@
     .log-row:nth-child(even) { background: rgba(0,0,0,0.02); }
     .log-row:hover { background: var(--bg-hover) !important; }
     .uppercase { text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
+    
+    .text-green { color: var(--green) !important; }
+    .text-yellow { color: var(--yellow) !important; }
+    .text-danger { color: var(--red) !important; }
+    .text-accent { color: var(--accent) !important; }
+    .bold { font-weight: 700; }
 </style>
 {% endblock %}

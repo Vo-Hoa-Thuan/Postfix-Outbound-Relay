@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% set active_page = "rotation_history" %}
+
+{% block title %}Rotation History – Postfix Relay Panel{% endblock %}
+
+{% block content %}
+<div class="section-header">
+    <div>
+        <h2 style="color: var(--accent); font-size: 1.2rem; letter-spacing: 0.1em; text-transform: uppercase;">📜 Rotation History</h2>
+        <p class="text-muted small">Timeline of outbound IP addresses and rotation triggers</p>
+    </div>
+    <div style="display: flex; gap: 1rem;">
+        <button onclick="fetchHistory()" class="btn btn-secondary">↻ Refresh Logs</button>
+    </div>
+</div>
+
+<div class="ops-card mt-4">
+    <div class="ops-card-header">
+        <h3 class="ops-card-title">Recent Events</h3>
+    </div>
+    <div class="ops-card-body" style="padding: 0;">
+        <table class="ops-table">
+            <thead>
+                <tr>
+                    <th style="width: 180px;">TIME</th>
+                    <th style="width: 150px;">OLD IP</th>
+                    <th style="width: 150px;">NEW IP</th>
+                    <th>REASON / TRIGGER</th>
+                </tr>
+            </thead>
+            <tbody id="historyBody">
+                <tr><td colspan="4" style="text-align: center; padding: 2rem; color: var(--text-muted);">Loading history...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+async function fetchHistory() {
+    try {
+        const res = await fetch('/api/rotation-history?t=' + Date.now());
+        const data = await res.json();
+        renderHistory(data);
+    } catch(e) { console.error("History failed:", e); }
+}
+
+function renderHistory(data) {
+    const body = document.getElementById('historyBody');
+    if (!body) return;
+    if (data.length === 0) {
+        body.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem; color: var(--text-muted);">No rotation events recorded.</td></tr>';
+        return;
+    }
+    body.innerHTML = '';
+    data.forEach(ev => {
+        const row = `
+            <tr>
+                <td class="small">${ev.time}</td>
+                <td class="mono small">${ev.old_ip || 'none'}</td>
+                <td class="mono bold text-accent">${ev.new_ip}</td>
+                <td>
+                    <span class="badge ${ev.reason === 'scheduled' ? 'badge-blue' : 'badge-yellow'}" style="font-size: 0.7rem; font-weight: 800;">
+                        ${ev.reason.toUpperCase()}
+                    </span>
+                </td>
+            </tr>`;
+        body.insertAdjacentHTML('beforeend', row);
+    });
+}
+
+document.addEventListener("DOMContentLoaded", fetchHistory);
+</script>
+{% endblock %}
