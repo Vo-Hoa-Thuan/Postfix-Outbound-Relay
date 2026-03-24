@@ -37,6 +37,8 @@ def _get_active_ip() -> Optional[str]:
 @router.get("", response_class=HTMLResponse)
 async def list_ips(request: Request, msg: str = "", error: str = ""):
     from core.relay import get_effective_limit
+    from core.fileio import read_json
+    from core.rotation import get_time_remaining
     data      = _read_ips()
     active_ip = _get_active_ip()
     ips_list = data.get("ips", [])
@@ -50,11 +52,17 @@ async def list_ips(request: Request, msg: str = "", error: str = ""):
             ip_cfg["last_blacklist_check_str"] = dt.strftime("%Y-%m-%d %H:%M:%S")
         else:
             ip_cfg["last_blacklist_check_str"] = "Never"
+            
+    ROTATION_CFG = os.path.join(BASE_DIR, "config", "rotation.json")
+    rot_cfg = read_json(ROTATION_CFG, {"rotation_seconds": 60, "mode": "weighted"})
         
     return templates.TemplateResponse("ips.html", {
         "request":   request,
         "ips":       ips_list,
         "active_ip": active_ip,
+        "rotation_secs": rot_cfg.get("rotation_seconds", 60),
+        "mode":          rot_cfg.get("mode", "weighted"),
+        "time_remaining": get_time_remaining(),
         "msg":       msg,
         "error":     error,
     })

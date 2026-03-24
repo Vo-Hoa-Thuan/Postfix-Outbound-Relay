@@ -16,18 +16,7 @@ router = APIRouter(prefix="/rspamd")
 RSPAMD_CFG = os.path.join(BASE_DIR, "config", "rspamd.json")
 
 
-@router.get("", response_class=HTMLResponse)
-async def show_rspamd(request: Request, msg: str = "", error: str = ""):
-    from core.fileio  import read_json
-    from core.rspamd  import get_status
-    cfg = read_json(RSPAMD_CFG, {})
-    return templates.TemplateResponse("rspamd.html", {
-        "request":    request,
-        "cfg":        cfg,
-        "status":     get_status(),
-        "msg":        msg,
-        "error":      error,
-    })
+
 
 
 @router.post("/save")
@@ -96,9 +85,9 @@ async def save_rspamd(
     # generate_config now handles both writing files and reloading
     ok, apply_msg = generate_config()
     if not ok:
-        return RedirectResponse(f"/rspamd?error={_enc(apply_msg)}", status_code=303)
+        return RedirectResponse(f"/diagnostics?error={_enc(apply_msg)}", status_code=303)
 
-    return RedirectResponse("/rspamd?msg=Rspamd+production+config+applied+and+reloaded", status_code=303)
+    return RedirectResponse("/diagnostics?msg=Rspamd+production+config+applied+and+reloaded", status_code=303)
 
 
 def _enc(s: str) -> str:

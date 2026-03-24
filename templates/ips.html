@@ -4,6 +4,9 @@
 {% block title %}IP Management – Operations Console{% endblock %}
 
 {% block content %}
+{% set mode = mode | default('weighted') %}
+{% set rotation_secs = rotation_secs | default(60) %}
+{% set time_remaining = time_remaining | default(0) %}
 <style>
     /* Premium UI Enhancements */
     .glass-header {
@@ -111,7 +114,7 @@
         <h3 class="ops-card-title" data-i18n="ttl_active_relay">📡 Active Node List</h3>
         <div style="display: flex; gap: 0.75rem;">
             <button onclick="bulkSync(true)" class="btn btn-secondary btn-xs" id="btn-sync-all" data-i18n="btn_dnsbl_sync">🛡️ Sync DNSBL</button>
-            <button onclick="refreshAllStatuses()" class="btn btn-secondary btn-xs">↻ Refresh UI</button>
+            <button onclick="refreshAllStatuses()" class="btn btn-secondary btn-xs" data-i18n="btn_refresh_ui">↻ Refresh UI</button>
         </div>
     </div>
     <div class="ops-card-body" style="padding: 0 1rem 1rem 1rem;">
@@ -180,27 +183,90 @@
     </div>
 </div>
 
+<div class="dashboard-grid mt-4" style="grid-template-columns: 2fr 1fr; gap: 1.5rem;">
+    <!-- Left: Rotation Config -->
+    <div class="ops-card mb-0">
+        <div class="ops-card-header">
+            <h3 class="ops-card-title" data-i18n="ttl_rotation_lb">🔄 Rotation & Load Balancing Strategy</h3>
+        </div>
+        <div class="ops-card-body">
+            <form action="/rotation/save" method="post" style="display: flex; flex-direction: column; gap: 1rem;">
+                <div class="form-row">
+                    <div class="form-group" style="flex: 1;">
+                        <label data-i18n="lbl_sch_interval">Scheduling Interval (Seconds)</label>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <input type="number" name="rotation_seconds" id="rotSecs" value="{{ rotation_secs }}" min="10" class="form-input" style="width: 120px;" />
+                            <button type="button" class="btn btn-secondary btn-xs" onclick="document.getElementById('rotSecs').value=15">15s</button>
+                            <button type="button" class="btn btn-secondary btn-xs" onclick="document.getElementById('rotSecs').value=60">1m</button>
+                            <button type="button" class="btn btn-secondary btn-xs" onclick="document.getElementById('rotSecs').value=300">5m</button>
+                        </div>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label data-i18n="lbl_algo">Selection Algorithm</label>
+                        <select name="mode" class="form-input">
+                            <option value="weighted" {% if mode == 'weighted' %}selected{% endif %} data-i18n="val_algo_weighted">Weighted (Priority based on weight)</option>
+                            <option value="roundrobin" {% if mode == 'roundrobin' %}selected{% endif %} data-i18n="val_algo_rr">Strict Round-Robin (Sequential)</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <button type="submit" class="btn btn-primary" data-i18n="btn_apply_policy">🚀 Apply Rotation Policy</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Right: Next Rotation & Manual -->
+    <div class="ops-card mb-0" style="border-top: 4px solid var(--accent); background: linear-gradient(135deg, var(--bg-surface), var(--bg-elevated));">
+        <div class="ops-card-header">
+            <h3 class="ops-card-title" data-i18n="ttl_next_rot">Next Rotation</h3>
+        </div>
+        <div class="ops-card-body" style="text-align: center; padding-top: 0.5rem;">
+            <div id="countdown" style="font-size: 2.5rem; font-weight: 800; color: var(--accent); font-family: var(--ff-mono);">
+                {{ time_remaining }}s
+            </div>
+            <span id="countdown-init" data-remaining="{{ time_remaining }}" style="display:none"></span>
+            <div class="text-muted small" data-i18n="lbl_timer_active">TIMER ACTIVE</div>
+            
+            <form action="/rotation/trigger" method="post" class="mt-4" style="border-top: 1px solid var(--border); padding-top: 1rem;">
+                <button type="submit" class="btn btn-secondary btn-full" data-i18n="btn_rotate_imm">⟳ Rotate Immediately</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4">
+    <a href="javascript:void(0)" onclick="loadRotationHistory()" class="btn btn-secondary" style="font-size: 0.8rem;" data-i18n="btn_view_rot_hist">📜 View Rotation History</a>
+    <div id="history-container" style="display: none; margin-top: 1rem; max-height: 300px; overflow-y: auto;" class="ops-card">
+        <div class="ops-card-body p-0">
+            <table class="ip-table-premium" style="font-size: 0.85rem; width: 100%;">
+                <tbody id="history-body"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 <!-- Modal: Add IP -->
 <div id="addModal" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(8px);">
     <div class="ops-card" style="width: 550px; border-top: 4px solid var(--accent);">
         <div class="ops-card-header">
-            <h3 class="ops-card-title">Provision New Relay Infrastructure</h3>
+            <h3 class="ops-card-title" data-i18n="ttl_prov_new_relay">Provision New Relay Infrastructure</h3>
             <button onclick="document.getElementById('addModal').style.display='none'" style="background: none; border: none; color: #fff; cursor: pointer;">✕</button>
         </div>
         <div class="ops-card-body" style="padding: 1.5rem;">
             <form action="/ips/add" method="post">
                 <div class="form-row">
-                    <div class="form-group"><label>IP Address</label><input type="text" name="ip" placeholder="1.2.3.4" class="form-input" required></div>
-                    <div class="form-group"><label>Hostname (HELO)</label><input type="text" name="hostname" placeholder="relay.example.com" class="form-input"></div>
+                    <div class="form-group"><label data-i18n="lbl_ip_addr">IP Address</label><input type="text" name="ip" placeholder="1.2.3.4" class="form-input" required></div>
+                    <div class="form-group"><label data-i18n="lbl_hostname">Hostname (HELO)</label><input type="text" name="hostname" placeholder="relay.example.com" class="form-input"></div>
                 </div>
                 <div class="form-row">
-                    <div class="form-group"><label>Weight</label><input type="number" name="weight" value="1" class="form-input"></div>
-                    <div class="form-group"><label>Limit / Hr</label><input type="number" name="limit_per_hour" value="2000" class="form-input"></div>
+                    <div class="form-group"><label data-i18n="lbl_weight">Weight</label><input type="number" name="weight" value="1" class="form-input"></div>
+                    <div class="form-group"><label data-i18n="lbl_limit_hr">Limit / Hr</label><input type="number" name="limit_per_hour" value="2000" class="form-input"></div>
                 </div>
-                <div class="form-group"><label>Operational Note</label><input type="text" name="note" class="form-input"></div>
+                <div class="form-group"><label data-i18n="lbl_note">Operational Note</label><input type="text" name="note" class="form-input"></div>
                 <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem;">
-                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('addModal').style.display='none'">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Start Provisioning</button>
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('addModal').style.display='none'" data-i18n="btn_cancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary" data-i18n="btn_start_prov">Start Provisioning</button>
                 </div>
             </form>
         </div>
@@ -211,24 +277,24 @@
 <div id="editModal" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1001; align-items: center; justify-content: center; backdrop-filter: blur(8px);">
     <div class="ops-card" style="width: 550px;">
         <div class="ops-card-header">
-            <h3 class="ops-card-title">Edit Configuration: <span id="edit-title-ip" class="text-accent mono"></span></h3>
+            <h3 class="ops-card-title"><span data-i18n="ttl_edit_config">Edit Configuration</span>: <span id="edit-title-ip" class="text-accent mono"></span></h3>
             <button onclick="document.getElementById('editModal').style.display='none'" style="background: none; border: none; color: #fff; cursor: pointer;">✕</button>
         </div>
         <div class="ops-card-body" style="padding: 1.5rem;">
             <form action="/ips/edit" method="post">
                 <input type="hidden" name="ip" id="edit-hidden-ip">
-                <div class="form-group"><label>Hostname</label><input type="text" name="hostname" id="edit-hostname" class="form-input"></div>
+                <div class="form-group"><label data-i18n="lbl_hostname">Hostname</label><input type="text" name="hostname" id="edit-hostname" class="form-input"></div>
                 <div class="form-row">
-                    <div class="form-group"><label>Weight</label><input type="number" name="weight" id="edit-weight" class="form-input"></div>
-                    <div class="form-group"><label>Limit / Hr</label><input type="number" name="limit_per_hour" id="edit-limit" class="form-input"></div>
+                    <div class="form-group"><label data-i18n="lbl_weight">Weight</label><input type="number" name="weight" id="edit-weight" class="form-input"></div>
+                    <div class="form-group"><label data-i18n="lbl_limit_hr">Limit / Hr</label><input type="number" name="limit_per_hour" id="edit-limit" class="form-input"></div>
                 </div>
-                <div class="form-group"><label>Operational Note</label><input type="text" name="note" id="edit-note" class="form-input"></div>
+                <div class="form-group"><label data-i18n="lbl_note">Operational Note</label><input type="text" name="note" id="edit-note" class="form-input"></div>
                 <div class="form-group">
-                    <label class="toggle-label"><input type="checkbox" name="enabled" id="edit-enabled" class="toggle-input"><span class="toggle-track"><span class="toggle-thumb"></span></span> IP ENABLED</label>
+                    <label class="toggle-label"><input type="checkbox" name="enabled" id="edit-enabled" class="toggle-input"><span class="toggle-track"><span class="toggle-thumb"></span></span> <span data-i18n="lbl_ip_enabled">IP ENABLED</span></label>
                 </div>
                 <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem;">
-                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('editModal').style.display='none'">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('editModal').style.display='none'" data-i18n="btn_cancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary" data-i18n="btn_save_changes">Save Changes</button>
                 </div>
             </form>
         </div>
@@ -351,9 +417,76 @@
         document.getElementById('editModal').style.display = 'flex';
     }
 
+    // Rotation Logic
+    const countdownInit = document.getElementById('countdown-init');
+    let remaining = parseInt(countdownInit ? countdownInit.dataset.remaining : 0);
+    const cdEl = document.getElementById('countdown');
+    let isPollingRot = false;
+
+    async function tick() {
+        if (!cdEl) return;
+        if (remaining > 0) {
+            remaining--;
+            cdEl.textContent = remaining + 's';
+        } else if (!isPollingRot) {
+            cdEl.textContent = '...';
+            syncRotStatus();
+        }
+    }
+
+    async function syncRotStatus() {
+        if (isPollingRot) return;
+        isPollingRot = true;
+        try {
+            const res = await fetch('/api/status');
+            const data = await res.json();
+            remaining = data.time_remaining;
+            if (cdEl) cdEl.textContent = remaining + 's';
+        } catch(e) {}
+        finally { isPollingRot = false; }
+    }
+    
+    async function loadRotationHistory() {
+        const cont = document.getElementById('history-container');
+        const tb = document.getElementById('history-body');
+        if (cont.style.display === 'block') {
+            cont.style.display = 'none';
+            return;
+        }
+        
+        const langData = typeof translations !== 'undefined' ? translations[localStorage.getItem('rp_lang') || 'vn'] || {} : {};
+        const loadingTxt = langData['txt_loading'] || 'Loading...';
+        const emptyTxt = langData['txt_no_rot_events'] || 'No rotation events found.';
+        const failedTxt = langData['txt_failed_load'] || 'Failed to load.';
+        const oldTxt = langData['txt_old'] || 'OLD';
+        const newTxt = langData['txt_new'] || 'NEW';
+        
+        tb.innerHTML = `<tr><td colspan="4" class="text-center text-muted">${loadingTxt}</td></tr>`;
+        cont.style.display = 'block';
+        try {
+            const res = await fetch('/api/rotation-history?limit=20');
+            const data = await res.json();
+            if (data.length === 0) {
+                tb.innerHTML = `<tr><td colspan="4" class="text-center text-muted">${emptyTxt}</td></tr>`;
+                return;
+            }
+            tb.innerHTML = data.map(ev => `
+                <tr style="border-bottom: 1px solid var(--border);">
+                    <td style="padding: 0.5rem 1rem;" class="text-muted">${ev.time}</td>
+                    <td style="padding: 0.5rem 1rem;"><span class="badge badge-blue">${oldTxt}: ${ev.old_ip || 'None'}</span></td>
+                    <td style="padding: 0.5rem 1rem;">➔</td>
+                    <td style="padding: 0.5rem 1rem;"><span class="badge badge-green">${newTxt}: ${ev.new_ip}</span></td>
+                    <td style="padding: 0.5rem 1rem;" class="text-muted small">${ev.trigger.toUpperCase()}</td>
+                </tr>
+            `).join('');
+        } catch(e) { tb.innerHTML = `<tr><td colspan="4" class="text-center text-danger">${failedTxt}</td></tr>`; }
+    }
+
     // Init
+    setInterval(tick, 1000);
+    setInterval(syncRotStatus, 15000); // sync timer occasionally
     setInterval(syncStatusPoll, 2000);
-    setInterval(refreshAllStatuses, 10000); // Slower full poll
+    setInterval(refreshAllStatuses, 10000);
     
     document.addEventListener('DOMContentLoaded', () => {
         syncStatusPoll();

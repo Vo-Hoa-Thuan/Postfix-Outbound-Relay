@@ -6,55 +6,55 @@
 {% block content %}
 <div class="section-header">
     <div>
-        <h2 style="color: var(--accent); font-size: 1.2rem; letter-spacing: 0.1em; text-transform: uppercase;">📊 Queue Manager</h2>
-        <p class="text-muted small">Monitor and manage the Postfix outbound mail queue</p>
+        <h2 style="color: var(--accent); font-size: 1.2rem; letter-spacing: 0.1em; text-transform: uppercase;" data-i18n="ttl_queue_main">📊 Queue Manager</h2>
+        <p class="text-muted small" data-i18n="txt_queue_desc">Monitor and manage the Postfix outbound mail queue</p>
     </div>
     <div style="display: flex; gap: 1rem;">
-        <button onclick="flushQueue()" id="flushBtn" class="btn btn-primary">⚡ Flush All Queues</button>
-        <button onclick="location.reload()" class="btn btn-secondary">↻ Refresh Status</button>
+        <button onclick="flushQueue()" id="flushBtn" class="btn btn-primary" data-i18n="btn_flush_all">⚡ Flush All Queues</button>
+        <button onclick="location.reload()" class="btn btn-secondary" data-i18n="btn_refresh_status">↻ Refresh Status</button>
     </div>
 </div>
 
 <div class="dashboard-grid mt-4" style="grid-template-columns: repeat(4, 1fr); gap: 1.5rem;">
     <div class="ops-card" style="border-top: 4px solid var(--green);">
         <div class="ops-card-body" style="text-align: center; padding: 1.5rem;">
-            <div class="text-muted small uppercase bold">Active</div>
+            <div class="text-muted small uppercase bold" data-i18n="lbl_active">Active</div>
             <div style="font-size: 2.5rem; font-weight: 800; font-family: var(--ff-mono); color: var(--green);">{{ queue.active }}</div>
-            <div class="small text-muted">Messages in delivery</div>
+            <div class="small text-muted" data-i18n="txt_active_desc">Messages in delivery</div>
         </div>
     </div>
     <div class="ops-card" style="border-top: 4px solid var(--yellow);">
         <div class="ops-card-body" style="text-align: center; padding: 1.5rem;">
-            <div class="text-muted small uppercase bold">Deferred</div>
+            <div class="text-muted small uppercase bold" data-i18n="lbl_deferred">Deferred</div>
             <div style="font-size: 2.5rem; font-weight: 800; font-family: var(--ff-mono); color: var(--yellow);">{{ queue.deferred }}</div>
-            <div class="small text-muted">Delayed/Retrying</div>
+            <div class="small text-muted" data-i18n="txt_deferred_desc">Delayed/Retrying</div>
         </div>
     </div>
     <div class="ops-card" style="border-top: 4px solid var(--red);">
         <div class="ops-card-body" style="text-align: center; padding: 1.5rem;">
-            <div class="text-muted small uppercase bold">Hold</div>
+            <div class="text-muted small uppercase bold" data-i18n="lbl_hold">Hold</div>
             <div style="font-size: 2.5rem; font-weight: 800; font-family: var(--ff-mono); color: var(--red);">{{ queue.hold }}</div>
-            <div class="small text-muted">Administratively frozen</div>
+            <div class="small text-muted" data-i18n="txt_hold_desc">Administratively frozen</div>
         </div>
     </div>
     <div class="ops-card" style="border-top: 4px solid var(--blue);">
         <div class="ops-card-body" style="text-align: center; padding: 1.5rem;">
-            <div class="text-muted small uppercase bold">Incoming</div>
+            <div class="text-muted small uppercase bold" data-i18n="lbl_incoming">Incoming</div>
             <div style="font-size: 2.5rem; font-weight: 800; font-family: var(--ff-mono); color: var(--blue);">{{ queue.incoming }}</div>
-            <div class="small text-muted">Awaiting processing</div>
+            <div class="small text-muted" data-i18n="txt_incoming_desc">Awaiting processing</div>
         </div>
     </div>
 </div>
 
 <div class="ops-card mt-4">
     <div class="ops-card-header">
-        <h3 class="ops-card-title">Queue Summary</h3>
+        <h3 class="ops-card-title" data-i18n="ttl_queue_summary">Queue Summary</h3>
     </div>
     <div class="ops-card-body">
         <div class="mono small" style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 4px; border: 1px solid var(--border);">
             {{ queue.summary }}
         </div>
-        <p class="text-muted small mt-2">
+        <p class="text-muted small mt-2" data-i18n="txt_queue_tip">
             Tip: Postfix automatically retries deferred messages based on the schedule set in main.cf.
         </p>
     </div>
@@ -62,24 +62,32 @@
 
 <script>
 async function flushQueue() {
-    if (!confirm("Are you sure you want to force all deferred messages to be retried immediately?")) return;
+    const langData = typeof translations !== 'undefined' ? translations[localStorage.getItem('rp_lang') || 'vn'] || {} : {};
+    const confirmTxt = langData['txt_flush_confirm_q'] || "Are you sure you want to force all deferred messages to be retried immediately?";
+    const flushingTxt = langData['txt_flushing'] || "Flushing...";
+    const successTxt = langData['txt_flush_success'] || "Queue flush triggered successfully.";
+    const errTxt = langData['txt_error'] || "Error: ";
+    const failedCommTxt = langData['txt_failed_comm'] || "Failed to communicate with server.";
+    const originalBtnTxt = langData['btn_flush_all'] || "⚡ Flush All Queues";
+
+    if (!confirm(confirmTxt)) return;
     const btn = document.getElementById('flushBtn');
     btn.disabled = true;
-    btn.textContent = "Flushing...";
+    btn.textContent = flushingTxt;
     try {
         const res = await fetch('/flush', { method: 'POST' });
         const data = await res.json();
         if (data.success) {
-            alert("Queue flush triggered successfully.");
+            alert(successTxt);
             location.reload();
         } else {
-            alert("Error: " + data.error);
+            alert(errTxt + data.error);
         }
     } catch(e) {
-        alert("Failed to communicate with server.");
+        alert(failedCommTxt);
     } finally {
         btn.disabled = false;
-        btn.textContent = "⚡ Flush All Queues";
+        btn.textContent = originalBtnTxt;
     }
 }
 </script>

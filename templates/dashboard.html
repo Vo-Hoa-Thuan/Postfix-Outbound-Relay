@@ -57,7 +57,7 @@
                 <span class="text-blue bold" style="font-family: var(--ff-mono);">[{{ count }}]</span>
             </span>
             {% else %}
-            <span style="color: var(--text-muted); font-size: 0.8rem; font-style: italic;">Không có dữ liệu</span>
+            <span style="color: var(--text-muted); font-size: 0.8rem; font-style: italic;" data-i18n="txt_no_data">Không có dữ liệu</span>
             {% endfor %}
         </div>
     </div>
@@ -72,7 +72,7 @@
                 <span class="text-blue bold" style="font-family: var(--ff-mono);">[{{ count }}]</span>
             </span>
             {% else %}
-            <span style="color: var(--text-muted); font-size: 0.8rem; font-style: italic;">Không có dữ liệu</span>
+            <span style="color: var(--text-muted); font-size: 0.8rem; font-style: italic;" data-i18n="txt_no_data">Không có dữ liệu</span>
             {% endfor %}
         </div>
     </div>
@@ -87,7 +87,7 @@
                 <div style="display: flex; gap: 0.3rem; align-items: center;">
                     <span style="font-size: 0.75rem; font-weight: bold; color: var(--text-muted);">LOG</span>
                     <select id="filter-date-top" class="form-input btn-xs" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; height: auto; outline: none; border-radius: 3px; border: 1px solid var(--border); background: var(--bg-base); color: var(--text-primary); min-width: 120px;" onchange="refreshLogs()">
-                        <option value="">-- TẤT CẢ NGÀY --</option>
+                        <option value="" data-i18n="opt_all_days">-- TẤT CẢ NGÀY --</option>
                         {% for udate in unique_dates %}
                         <option value="{{ udate }}">{{ udate }}</option>
                         {% endfor %}
@@ -96,14 +96,14 @@
                 <div style="display: flex; gap: 0.3rem; align-items: center;">
                     <span style="font-size: 0.75rem; font-weight: bold; color: var(--text-muted);">IP</span>
                     <select id="filter-ip-top" class="form-input btn-xs" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; height: auto; outline: none; border-radius: 3px; border: 1px solid var(--border); background: var(--bg-base); color: var(--text-primary); min-width: 120px;" onchange="refreshLogs()">
-                        <option value="">-- TẤT CẢ IP --</option>
+                        <option value="" data-i18n="opt_all_ips">-- TẤT CẢ IP --</option>
                         {% for uip in unique_ips %}
                         <option value="{{ uip }}">{{ uip }}</option>
                         {% endfor %}
                     </select>
                 </div>
             </div>
-            <button onclick="refreshLogs()" class="btn btn-secondary btn-xs" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; height: auto;">↻ Cập nhật</button>
+            <button onclick="refreshLogs()" class="btn btn-secondary btn-xs" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; height: auto;" data-i18n="btn_refresh">↻ Cập nhật</button>
         </div>
     </div>
     <div class="ops-card-body" style="padding: 0; height: 60vh; overflow-y: auto;">

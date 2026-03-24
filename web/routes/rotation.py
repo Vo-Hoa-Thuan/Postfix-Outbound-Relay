@@ -15,21 +15,6 @@ router = APIRouter(prefix="/rotation")
 ROTATION_CFG = os.path.join(BASE_DIR, "config", "rotation.json")
 
 
-@router.get("", response_class=HTMLResponse)
-async def show_rotation(request: Request, msg: str = "", error: str = ""):
-    from core.fileio   import read_json
-    from core.rotation import get_time_remaining
-    cfg = read_json(ROTATION_CFG, {"rotation_seconds": 60, "mode": "weighted"})
-    return templates.TemplateResponse("rotation.html", {
-        "request":       request,
-        "rotation_secs": cfg.get("rotation_seconds", 60),
-        "mode":          cfg.get("mode", "weighted"),
-        "time_remaining": get_time_remaining(),
-        "msg":           msg,
-        "error":         error,
-    })
-
-
 @router.post("/save")
 async def save_rotation(
     rotation_seconds: int = Form(60),
@@ -37,14 +22,14 @@ async def save_rotation(
 ):
     from core.fileio import write_json
     if rotation_seconds < 10:
-        return RedirectResponse("/rotation?error=Minimum+rotation+interval+is+10+seconds", status_code=303)
+        return RedirectResponse("/ips?error=Minimum+rotation+interval+is+10+seconds", status_code=303)
     if mode not in ("roundrobin", "weighted"):
         mode = "weighted"
     write_json(ROTATION_CFG, {
         "rotation_seconds": rotation_seconds,
         "mode":             mode,
     })
-    return RedirectResponse("/rotation?msg=Rotation+settings+saved", status_code=303)
+    return RedirectResponse("/ips?msg=Rotation+settings+saved", status_code=303)
 
 
 @router.post("/trigger")
@@ -67,14 +52,8 @@ async def trigger_rotation(request: Request):
                 "time_remaining": get_time_remaining(),
                 "msg": f"Rotated to {new_ip}"
             }
-        return RedirectResponse(f"/rotation?msg=Rotated+to+{new_ip}", status_code=303)
+        return RedirectResponse(f"/ips?msg=Rotated+to+{new_ip}", status_code=303)
     
     if "application/json" in request.headers.get("accept", ""):
         return {"success": False, "error": "No enabled IPs available"}
-    return RedirectResponse("/rotation?error=No+enabled+IPs+available", status_code=303)
-@router.get("/history", response_class=HTMLResponse)
-async def rotation_history_page(request: Request):
-    return templates.TemplateResponse("rotation_history.html", {
-        "request": request,
-        "active_page": "rotation_history"
-    })
+    return RedirectResponse("/ips?error=No+enabled+IPs+available", status_code=303)

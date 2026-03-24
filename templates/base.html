@@ -29,47 +29,6 @@
     </div>
 
     <style>
-      .nav-dropdown {
-        position: relative;
-        display: inline-flex;
-        align-items: center;
-      }
-      .nav-dropdown-content {
-        display: none;
-        position: absolute;
-        top: 100%;
-        left: 0;
-        background-color: var(--bg-elevated);
-        min-width: 200px;
-        box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.5);
-        z-index: 100;
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        margin-top: 2px;
-        overflow: hidden;
-      }
-      .nav-dropdown-content a {
-        color: var(--text-muted);
-        padding: 0.6rem 1rem;
-        text-decoration: none;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        font-size: 0.85rem;
-        font-weight: 600;
-        border-bottom: 1px solid rgba(255,255,255,0.05);
-      }
-      .nav-dropdown-content a:last-child {
-        border-bottom: none;
-      }
-      .nav-dropdown-content a:hover {
-        background-color: var(--accent);
-        color: #fff;
-      }
-      .nav-dropdown-content a .icon { margin-right: 0.3rem; }
-      .nav-dropdown:hover .nav-dropdown-content {
-        display: block;
-      }
       .nav-tab.dropdown-btn {
         border: none;
         background: transparent;
@@ -85,55 +44,27 @@
         <span class="icon">⬡</span> <span data-i18n="nav_dashboard">Bảng điều khiển</span>
       </a>
 
-      <!-- Network Dropdown -->
-      <div class="nav-dropdown">
-        <button class="nav-tab dropdown-btn {% if active_page in ['ips', 'rotation', 'rotation_history'] %}active{% endif %}">
-          <span class="icon">◈</span> <span data-i18n="nav_network">Network & IP</span> <span style="font-size: 0.6rem; opacity: 0.6; padding-top: 2px;">▼</span>
-        </button>
-        <div class="nav-dropdown-content">
-          <a href="/ips" class="{% if active_page == 'ips' %}active{% endif %}">
-            <span class="icon">◈</span> <span data-i18n="nav_ips">Quản lý IP</span>
-          </a>
-          <a href="/rotation" class="{% if active_page == 'rotation' %}active{% endif %}">
-            <span class="icon">↻</span> <span data-i18n="nav_rotation">Xoay IP</span>
-          </a>
-          <a href="/rotation/history" class="{% if active_page == 'rotation_history' %}active{% endif %}">
-            <span class="icon">📜</span> <span data-i18n="nav_rot_history">Lịch sử Xoay IP</span>
-          </a>
-        </div>
-      </div>
+      <a href="/ips" class="nav-tab {% if active_page in ['ips', 'rotation', 'rotation_history'] %}active{% endif %}">
+        <span class="icon">◈</span> <span data-i18n="nav_network">Mạng & IP</span>
+      </a>
 
       <a href="/queue" class="nav-tab {% if active_page == 'queue' %}active{% endif %}">
         <span class="icon">📊</span> <span data-i18n="nav_queue">Quản lý Hàng đợi</span>
       </a>
 
-      <!-- System Dropdown -->
-      <div class="nav-dropdown">
-        <button class="nav-tab dropdown-btn {% if active_page in ['rspamd', 'diagnostics', 'settings'] %}active{% endif %}">
-          <span class="icon">⚙️</span> <span data-i18n="nav_system">System</span> <span style="font-size: 0.6rem; opacity: 0.6; padding-top: 2px;">▼</span>
-        </button>
-        <div class="nav-dropdown-content">
-          <a href="/rspamd" class="{% if active_page == 'rspamd' %}active{% endif %}">
-            <span class="icon">⚙</span> <span data-i18n="nav_rspamd">Rspamd</span>
-          </a>
-          <a href="/diagnostics" class="{% if active_page == 'diagnostics' %}active{% endif %}">
-            <span class="icon">🩺</span> <span data-i18n="nav_diag">Chẩn đoán</span>
-          </a>
-          <a href="/settings" class="{% if active_page == 'settings' %}active{% endif %}">
-            <span class="icon">⚙️</span> <span data-i18n="nav_settings">Cài đặt</span>
-          </a>
-        </div>
-      </div>
+      <a href="/diagnostics" class="nav-tab {% if active_page in ['rspamd', 'diagnostics'] %}active{% endif %}">
+        <span class="icon">🩺</span> <span data-i18n="nav_system">Hệ thống</span>
+      </a>
+
+      <a href="/settings" class="nav-tab {% if active_page == 'settings' %}active{% endif %}">
+        <span class="icon">⚙️</span> <span data-i18n="nav_settings">Cài đặt</span>
+      </a>
     </nav>
 
-    <div class="header-actions">
+    <div class="header-actions" style="display: flex; align-items: center; gap: 0.75rem;">
       <!-- Language Switcher -->
-      <div class="lang-switcher" style="display: flex; gap: 0.5rem; margin-right: 1rem; padding-right: 1rem; border-right: 1px solid var(--border);">
-        <button class="btn btn-secondary btn-xs" onclick="switchLanguage('vn')" title="Tiếng Việt">VN</button>
-        <button class="btn btn-secondary btn-xs" onclick="switchLanguage('en')" title="English">EN</button>
-      </div>
+      <button class="btn btn-secondary btn-xs" onclick="toggleLanguage()" title="Translate" id="langToggleBtn" style="min-width: 60px;">🌐 VN</button>
       
-      <div class="clock-box" id="clock">00:00:00</div>
       <button class="btn btn-secondary btn-xs" id="themeBtn" onclick="toggleTheme()">
         <span id="themeIcon">☀</span>
       </button>
@@ -164,21 +95,20 @@
       document.getElementById('themeIcon').textContent = isLight ? '🌙' : '☀';
     }
 
-    // Live Clock
-    function updateClock() {
-      const now = new Date();
-      const yr = now.getFullYear();
-      const mo = String(now.getMonth() + 1).padStart(2, '0');
-      const da = String(now.getDate()).padStart(2, '0');
-      document.getElementById('clock').textContent = `${yr}-${mo}-${da} ${now.toLocaleTimeString('en-GB')}`;
+    function toggleLanguage() {
+      let current = localStorage.getItem('rp_lang') || 'vn';
+      let next = current === 'vn' ? 'en' : 'vn';
+      if (typeof switchLanguage === 'function') switchLanguage(next);
+      document.getElementById('langToggleBtn').textContent = '🌐 ' + next.toUpperCase();
     }
-    setInterval(updateClock, 1000);
-    updateClock();
 
     // Init theme icon
     window.addEventListener('DOMContentLoaded', () => {
       const isLight = document.body.classList.contains('light');
       document.getElementById('themeIcon').textContent = isLight ? '🌙' : '☀';
+      
+      let currentLang = localStorage.getItem('rp_lang') || 'vn';
+      document.getElementById('langToggleBtn').textContent = '🌐 ' + currentLang.toUpperCase();
       
       // Auto-dismiss flashes
       setTimeout(() => {

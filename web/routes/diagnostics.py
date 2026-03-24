@@ -21,10 +21,18 @@ async def diagnostics_home(request: Request, msg: str = "", error: str = ""):
     queue = get_queue_status()
     identity = get_postfix_identity()
     
+    from core.fileio import read_json
+    from core.rspamd import get_status as get_rspamd_status
+    RSPAMD_CFG = os.path.join(BASE_DIR, "config", "rspamd.json")
+    cfg = read_json(RSPAMD_CFG, {})
+    rspamd_status = get_rspamd_status()
+    
     return templates.TemplateResponse("diagnostics.html", {
         "request": request,
         "queue": queue,
         "identity": identity,
+        "cfg": cfg,
+        "status": rspamd_status,
         "msg": msg,
         "error": error
     })
