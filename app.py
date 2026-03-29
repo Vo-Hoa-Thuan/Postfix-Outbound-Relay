@@ -9,6 +9,19 @@ import sys
 import time
 import asyncio
 
+# BẢN VÁ CHO PYTHON 3.6 TRÊN CENTOS CŨ CỦA NGƯỜI DÙNG:
+if sys.version_info < (3, 7):
+    import asyncio
+    if not hasattr(asyncio, "create_task"):
+        asyncio.create_task = asyncio.ensure_future
+    if not hasattr(asyncio, "get_running_loop"):
+        asyncio.get_running_loop = asyncio.get_event_loop
+    if not hasattr(asyncio, "run"):
+        def _poly_run(coro):
+            loop = asyncio.get_event_loop()
+            return loop.run_until_complete(coro)
+        asyncio.run = _poly_run
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
