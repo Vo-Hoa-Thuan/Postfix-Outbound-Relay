@@ -149,5 +149,14 @@ async def _init_defaults():
 # ── Run directly ──────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
-    # Python 3.6 might have issues with uvicorn reload in some versions
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=False)
+    import sys
+    
+    # Xử lý Lỗi thư viện Uvicorn gọi asyncio.run() không tồn tại trên Python 3.6
+    if sys.version_info < (3, 7):
+        import asyncio
+        config = uvicorn.Config("app:app", host="0.0.0.0", port=8000, reload=False)
+        server = uvicorn.Server(config)
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(server.serve())
+    else:
+        uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=False)
