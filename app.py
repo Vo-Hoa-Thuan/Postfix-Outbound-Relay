@@ -16,6 +16,10 @@ if sys.version_info < (3, 7):
         asyncio.create_task = asyncio.ensure_future
     if not hasattr(asyncio, "get_running_loop"):
         asyncio.get_running_loop = asyncio.get_event_loop
+    if not hasattr(asyncio, "current_task"):
+        asyncio.current_task = getattr(asyncio.Task, "current_task", None)
+    if not hasattr(asyncio, "all_tasks"):
+        asyncio.all_tasks = getattr(asyncio.Task, "all_tasks", None)
     if not hasattr(asyncio, "run"):
         def _poly_run(coro):
             loop = asyncio.get_event_loop()
