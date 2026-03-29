@@ -430,10 +430,26 @@ def _parse_line(line: str, qid_map: Dict[str, str]) -> Optional[dict]:
         }
     return None
 
+from filelock import FileLock, Timeout
+
 def _save_entries(entries: list) -> None:
-    with open(PARSED_LOG, "a", encoding="utf-8") as out:
-        for e in entries:
-            out.write(json.dumps(e, ensure_ascii=False) + "\n")
+    if not entries: return
+    
+    lock = FileLock(PARSED_LOG + ".lock", timeout=5)
+    try:
+        with lock.acquire(timeout=5):
+            # Rotate if file > 50MB
+            if os.path.exists(PARSED_LOG) and os.path.getsize(PARSED_LOG) > 50 * 1024 * 1024:
+                bak_path = PARSED_LOG + ".1"
+                if os.path.exists(bak_path):
+                    os.remove(bak_path)
+                os.rename(PARSED_LOG, bak_path)
+                
+            with open(PARSED_LOG, "a", encoding="utf-8") as out:
+                for e in entries:
+                    out.write(json.dumps(e, ensure_ascii=False) + "\n")
+    except Timeout:
+        print("[LogReader] WARNING: Could not acquire lock for parsed.log")
 
 # ── Chart Aggregator ────────────────────────────────────────────────────────
 CHART_CACHE_FILE = os.path.join(BASE_DIR, "runtime", "chart_cache.json")

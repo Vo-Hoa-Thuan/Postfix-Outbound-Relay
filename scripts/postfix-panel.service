@@ -1,0 +1,28 @@
+[Unit]
+Description=Postfix Outbound Relay Panel - Gunicorn Daemon
+After=network.target postfix.service rspamd.service
+
+[Service]
+# User running this service. Make sure it has write permissions to /etc/postfix and /etc/rspamd/local.d
+# Or run as root if necessary (Recommended to use sudoers instead, but for this panel root is often used in sysadmin scope)
+User=root
+Group=root
+
+# Change this to the exact path of your project
+WorkingDirectory=/opt/Postfix-Outbound-Relay
+
+# The environment path for Python packages (or virtualenv path)
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# We use Uvicorn running under Gunicorn for Production stability
+# Make sure to pip install gunicorn uvicorn[standard]
+ExecStart=/usr/local/bin/gunicorn app:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind unix:postfix_panel.sock -m 007
+# Alternatively if not using unix socket (for proxy), use TCP bind:
+# ExecStart=/usr/local/bin/gunicorn app:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 127.0.0.1:8000
+
+# Always restart if crashed
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

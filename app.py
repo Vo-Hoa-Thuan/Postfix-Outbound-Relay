@@ -36,13 +36,19 @@ from web.routes.rotation  import router as rotation_router
 from web.routes.rspamd    import router as rspamd_router
 from web.routes.settings  import router as settings_router
 from web.routes.diagnostics import router as diagnostics_router
+from web.routes.auth      import router as auth_router
 
-app.include_router(dashboard_router)
-app.include_router(ips_router)
-app.include_router(rotation_router)
-app.include_router(rspamd_router)
-app.include_router(settings_router)
-app.include_router(diagnostics_router)
+from fastapi import Depends
+from core.auth import do_auth
+auth_dep = [Depends(do_auth)]
+
+app.include_router(auth_router) # Không cần check session
+app.include_router(dashboard_router, dependencies=auth_dep)
+app.include_router(ips_router, dependencies=auth_dep)
+app.include_router(rotation_router, dependencies=auth_dep)
+app.include_router(rspamd_router, dependencies=auth_dep)
+app.include_router(settings_router, dependencies=auth_dep)
+app.include_router(diagnostics_router, dependencies=auth_dep)
 
 
 import asyncio
@@ -95,6 +101,8 @@ async def _background_tasks():
 async def _init_defaults():
     from core.fileio import ensure_json
 
+    from core.auth import hash_password
+
     defaults = {
         os.path.join(BASE_DIR, "config", "relay_ips.json"):  {"ips": []},
         os.path.join(BASE_DIR, "config", "rotation.json"):   {"rotation_seconds": 60, "mode": "weighted"},
@@ -104,12 +112,25 @@ async def _init_defaults():
             "whitelist_ips": [], "blacklist_domains": []
         },
         os.path.join(BASE_DIR, "config", "limits.json"):     {},
+        os.path.join(BASE_DIR, "config", "admin.json"):      {"username": "admin", "password_hash": hash_password("sieutocviet")},
         os.path.join(BASE_DIR, "runtime", "ip_state.json"):  {"active_ip": None, "last_rotated": 0},
         os.path.join(BASE_DIR, "runtime", "counters.json"):  {},
     }
 
     for path, default in defaults.items():
         ensure_json(path, default)
+
+    # Lọc migration cho admin.json từ plaintext lên Hash
+    admin_path = os.path.join(BASE_DIR, "config", "admin.json")
+    from core.fileio import read_json, write_json
+    admin_cfg = read_json(admin_path, {})
+    if "password" in admin_cfg:
+        pw = admin_cfg.pop("password")
+        if "password_hash" not in admin_cfg:
+            # Nếu người dùng đã cài pass cũ, giữ pass đó nhưng mã hoá. Chỗ này sẽ chuyển mật khẩu cũ thành mã hoá.
+            # Nhờ user yêu cầu đổi pass thành sieutocviet, ta ưu tiên ghi đè:
+            admin_cfg["password_hash"] = hash_password("sieutocviet")
+        write_json(admin_path, admin_cfg)
 
     # Ensure logs/parsed.log exists
     parsed_log = os.path.join(BASE_DIR, "logs", "parsed.log")
