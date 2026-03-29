@@ -21,7 +21,7 @@ def get_message_history(msg_id_snippet: str, limit: int = 50) -> List[Dict[str, 
         # We search the last hour of logs
         cmd_base = ""
         if os.name != 'nt':
-            if subprocess.run("which journalctl", shell=True, capture_output=True).returncode == 0:
+            if subprocess.run("which journalctl", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode == 0:
                 cmd_base = "journalctl -u postfix --since '1 hour ago'"
             elif os.path.exists("/var/log/mail.log"):
                 cmd_base = "cat /var/log/mail.log"
@@ -31,7 +31,7 @@ def get_message_history(msg_id_snippet: str, limit: int = 50) -> List[Dict[str, 
 
         # Try to find the Queue ID first
         find_qid_cmd = f"{cmd_base} | grep '{msg_id_snippet}' | head -n 1"
-        res = subprocess.run(find_qid_cmd, shell=True, capture_output=True, text=True, timeout=5)
+        res = subprocess.run(find_qid_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=5)
         
         search_term = msg_id_snippet
         first_line = res.stdout.strip()
@@ -43,7 +43,7 @@ def get_message_history(msg_id_snippet: str, limit: int = 50) -> List[Dict[str, 
 
         # Step 2: Get all lines for that search_term (Queue ID)
         trace_cmd = f"{cmd_base} | grep '{search_term}' | tail -n {limit}"
-        res = subprocess.run(trace_cmd, shell=True, capture_output=True, text=True, timeout=10)
+        res = subprocess.run(trace_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=10)
 
         for line in res.stdout.splitlines():
             line = line.strip()
@@ -83,7 +83,7 @@ def get_queue_status() -> Dict[str, Any]:
     try:
         # Use qshape or count files in spool if available
         # But for basics, we parse 'mailq'
-        res = subprocess.run("mailq | tail -n 1", shell=True, capture_output=True, text=True)
+        res = subprocess.run("mailq | tail -n 1", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         line = res.stdout.strip()
         if line:
             status["summary"] = line

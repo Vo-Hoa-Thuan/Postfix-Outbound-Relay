@@ -74,7 +74,7 @@ def run_command(cmd: str, timeout: int = 15) -> Tuple[bool, str]:
             return False, f"Bypassing system command on Windows: {cmd}"
 
         result = subprocess.run(
-            cmd, shell=True, capture_output=True, text=True, timeout=timeout
+            cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout
         )
         out = (result.stdout + result.stderr).strip()
         return result.returncode == 0, out
