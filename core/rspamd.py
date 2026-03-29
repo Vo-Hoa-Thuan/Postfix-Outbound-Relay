@@ -33,7 +33,7 @@ def get_status() -> str:
     """Check if service is active."""
     import subprocess
     try:
-        res = subprocess.run("systemctl is-active rspamd", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        res = subprocess.run("systemctl is-active rspamd", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         return "running" if res.stdout.strip() == "active" else "stopped"
     except:
         return "unknown"
