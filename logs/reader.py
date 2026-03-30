@@ -241,7 +241,7 @@ def _parse_journal_incremental(state: dict) -> None:
         print(f"[LogReader] Journal incremental error: {e}")
 
 RE_RSPAMD_LOG = re.compile(
-    r"qid: <(?P<qid>[^>]+)>.*?\(.*?[A-Z]\s*\([^)]*\):\s*\[(?P<score>[\d\.-]+)\/[\d\.-]+\]\s*\[(?P<symbols>.*?)\]\)"
+    r"qid: <(?P<qid>[^>]+)>.*?\[(?P<score>[\d\.-]+)\/[\d\.-]+\]\s*\[(?P<symbols>.*?)\]\)"
 )
 
 def _parse_rspamd_log(state: dict) -> None:
