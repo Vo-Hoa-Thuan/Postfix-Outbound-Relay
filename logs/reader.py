@@ -21,6 +21,7 @@ RE_SMTP = re.compile(
     r"(?P<month>\w+)\s+(?P<day>\d+)\s+(?P<time>\d+:\d+:\d+)"
     r".*?postfix/([^/]+/)?(smtp|lmtp|local|virtual|pipe)\[\d+\]:\s+(?P<qid>\w+):\s+"
     r"to=<(?P<to>[^>]+)>.*?"
+    r"(?:relay=(?P<relay>[^\s,]+)[,\s]+)?"
     r"(?:delay=(?P<delay>[\d\.]+),\s+delays=(?P<delays>[\d\./]+),\s+.*?)?"
     r"status=(?P<status>\w+)(?:\s+\((?P<resp>.*?)\))?"
 )
@@ -43,7 +44,7 @@ RE_QID_CLIENT = re.compile(
     r"postfix/([^/]+/)?smtpd\[\d+\]:\s+(?P<qid>\w+):.*?client=[^\[]+\[(?P<ip>\d+\.\d+\.\d+\.\d+)\](?:.*?(?:sasl_username=(?P<sasl>[^,\s]+)))?"
 )
 RE_QID_ERROR = re.compile(
-    r"postfix/([^/]+)\[\d+\]:\s+(?P<qid>\w+):\s+(?P<level>fatal|error|warning):\s+(?P<msg>.*)"
+    r"postfix/([^/]+)\[\d+\]:\s+(?P<qid>\w+):\s+(?P<level>fatal|error|warning):\s+(?!header Subject)(?P<msg>.*)"
 )
 RE_QID_RSPAMD = re.compile(
     r"postfix/(smtpd|cleanup)\[\d+\]:\s+(?P<qid>\w+):.*?milter-(reject|keep|accept|discard):.*?score=(?P<score>[\d\.-]+)\s+symbols=(?P<symbols>.*)"
@@ -377,10 +378,10 @@ def _parse_line(line: str, qid_map: Dict[str, str]) -> Optional[dict]:
         tls_ver = qid_info.get("tls_ver", None) if isinstance(qid_info, dict) else None
         cipher = qid_info.get("cipher", None) if isinstance(qid_info, dict) else None
         
-        # Postfix relays log IP in output. Or we match RE_RELAY_IP.
+        relay_str = s_dict.get("relay") or ""
         dest_ip = ""
-        if resp:
-            rip_m = RE_RELAY_IP.search("relay=" + resp if "relay=" not in resp else resp)
+        if relay_str:
+            rip_m = RE_RELAY_IP.search(f"relay={relay_str}")
             if rip_m: dest_ip = rip_m.group("ip")
             
         entry = {
@@ -392,7 +393,7 @@ def _parse_line(line: str, qid_map: Dict[str, str]) -> Optional[dict]:
             "subject": subj,
             "status": status,
             "response": resp,
-            "local_ip": "", # Usually postfix doesn't explicitly log local IP bound unless detailed postfix logging is on
+            "local_ip": client, # Sử dụng Client IP thay thế cho Local Interface
             "dest_ip": dest_ip,
             "client_ip": client,
             "sasl": sasl,
