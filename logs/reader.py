@@ -258,6 +258,8 @@ def _parse_rspamd_log(state: dict) -> None:
         offset = file_size - (1 * 1024 * 1024)
         
     new_offset = offset
+    with open("/tmp/rspamd_debug.txt", "a") as dbg:
+        dbg.write(f"Starting parse at offset {offset}, total size {file_size}\n")
     try:
         with open(rspamd_log, "r", errors="replace") as f:
             f.seek(offset)
@@ -270,10 +272,14 @@ def _parse_rspamd_log(state: dict) -> None:
                         if qid not in state["qid_map"]: state["qid_map"][qid] = {}
                         if isinstance(state["qid_map"][qid], str): state["qid_map"][qid] = {"from": state["qid_map"][qid]}
                         state["qid_map"][qid]["spam_score"] = float(m.group("score"))
-                        state["qid_map"][qid]["spam_symbols"] = m.group("symbols").strip()
+                        # Symbol check disabled for minimal robust matching
+                        state["qid_map"][qid]["spam_symbols"] = ""
+                        with open("/tmp/rspamd_debug.txt", "a") as dbg:
+                            dbg.write(f"Matched QID {qid} with Score {m.group('score')}\n")
         state["rspamd_offset"] = new_offset
     except Exception as e:
-        pass
+        with open("/tmp/rspamd_debug.txt", "a") as f:
+            f.write(f"Rspamd Parse Error: {e}\n")
 
 def _parse_files(target_logs: list, limit_per_file: int, state: dict) -> None:
     if "offsets" not in state: state["offsets"] = {}
