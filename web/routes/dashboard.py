@@ -17,6 +17,15 @@ router = APIRouter()
 def _read_recent_logs(limit=20):
     """Fast tail-read of the parsed.log file without reading the whole file."""
     parsed_log = os.path.join(BASE_DIR, "logs", "parsed.log")
+    state_file = os.path.join(BASE_DIR, "runtime", "reader_state.json")
+    
+    qid_map = {}
+    try:
+        if os.path.exists(state_file):
+            with open(state_file, "r") as sf:
+                qid_map = json.load(sf).get("qid_map", {})
+    except: pass
+    
     if not os.path.exists(parsed_log): return []
     try:
         with open(parsed_log, "rb") as f:
@@ -35,7 +44,14 @@ def _read_recent_logs(limit=20):
                 line = line.strip()
                 if not line: continue
                 try:
-                    results.append(json.loads(line))
+                    entry = json.loads(line)
+                    qid = entry.get("qid")
+                    if qid and qid in qid_map:
+                        mem_val = qid_map[qid]
+                        if isinstance(mem_val, dict) and mem_val.get("spam_score") is not None:
+                            entry["spam_score"] = mem_val["spam_score"]
+                            entry["spam_symbols"] = mem_val.get("spam_symbols", "")
+                    results.append(entry)
                     if len(results) >= limit: break
                 except: continue
             return results
@@ -205,6 +221,8 @@ async def api_chart():
     if os.path.exists(cache_path):
         return read_json(cache_path, {})
     return {"labels": [], "datasets": {"sent": [], "deferred": [], "bounced": []}}
+
+
 
 @router.get("/api/rotation-history")
 async def api_rotation_history(limit: int = 20):

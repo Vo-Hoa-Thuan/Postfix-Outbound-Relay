@@ -1,28 +1,41 @@
+import json
+import os
 import sys
-import asyncio
 
-# Vá lõi cho Python 3.6
-if sys.version_info < (3, 7):
-    if not hasattr(asyncio, "create_task"):
-        asyncio.create_task = asyncio.ensure_future
-    if not hasattr(asyncio, "get_running_loop"):
-        asyncio.get_running_loop = asyncio.get_event_loop
-    if not hasattr(asyncio, "run"):
-        def _poly_run(coro):
-            loop = asyncio.get_event_loop()
-            return loop.run_until_complete(coro)
-        asyncio.run = _poly_run
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATE_FILE = os.path.join(BASE_DIR, "runtime", "reader_state.json")
+PARSED_LOG = os.path.join(BASE_DIR, "logs", "parsed.log")
 
-from fastapi import FastAPI
-app = FastAPI()
-
-@app.get("/")
-def read_root():
-    return {"status": "SUCCESS", "message": "FastAPI is NOT broken!"}
+def diagnostic():
+    if not os.path.exists(PARSED_LOG):
+        print("NO parsed.log FOUND")
+        return
+        
+    print("--- LAST 5 PARSED ENTRIES ---")
+    with open(PARSED_LOG, "r") as f:
+        lines = f.readlines()
+        for ln in lines[-5:]:
+            try:
+                data = json.loads(ln.strip())
+                print(f"[{data.get('time')}] QID: {data.get('qid')} -> SCORE: {data.get('spam_score')} | SYMBOLS: {str(data.get('spam_symbols'))[:30]}")
+            except:
+                pass
+                
+    if not os.path.exists(STATE_FILE):
+        print("NO state.json FOUND")
+        return
+        
+    print("\n--- STATE MAP INFO ---")
+    with open(STATE_FILE, "r") as f:
+        state = json.load(f)
+        qmap = state.get("qid_map", {})
+        print(f"Total QIDs in memory: {len(qmap)}")
+        
+        # Check if recent QIDs had score populated
+        scored_qids = [q for q, v in qmap.items() if isinstance(v, dict) and "spam_score" in v]
+        print(f"Total QIDs with spam_score: {len(scored_qids)}")
+        for sq in scored_qids[-3:]:
+             print(f"  {sq}: {qmap[sq]['spam_score']}")
 
 if __name__ == "__main__":
-    import uvicorn
-    # Test thu nhỏ không dính dáng gì tới đống file Code của Panel
-    # Nếu chạy script này mà Web xoay vòng -> Lỗi tại thư viện Uvicorn/FastAPI trên Python 3.6
-    # Nếu Web hiện chữ SUCCESS -> Lỗi nằm ở 1 dòng Code nào đó của tôi
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    diagnostic()
