@@ -41,7 +41,12 @@ async def list_ips(request: Request, msg: str = "", error: str = ""):
     from core.rotation import get_time_remaining
     data      = _read_ips()
     active_ip = _get_active_ip()
-    ips_list = data.get("ips", [])
+    # Sanitize: Remove entries with null or empty IP
+    ips_list = [ip for ip in data.get("ips", []) if ip.get("ip")]
+    if len(ips_list) != len(data.get("ips", [])):
+        data["ips"] = ips_list
+        _write_ips(data)
+    
     import datetime
     for ip_cfg in ips_list:
         ip_cfg["effective_limit"] = get_effective_limit(ip_cfg)
@@ -94,12 +99,12 @@ async def add_ip(
         except socket.gaierror:
             return RedirectResponse(f"/ips?error=Could+not+resolve+hostname:+{hostname}", status_code=303)
 
-    # Duplicate check
-    if any(x["ip"] == ip for x in ips):
-        return RedirectResponse(f"/ips?error=IP+{ip}+already+exists", status_code=303)
+    # Validation
+    if not ip or not ip.strip():
+        return RedirectResponse(f"/ips?error=IP+address+is+required", status_code=303)
 
     ips.append({
-        "ip":             ip,
+        "ip":             ip.strip(),
         "hostname":       hostname.strip(),
         "enabled":        enabled == "on",
         "weight":         max(1, weight),
@@ -140,6 +145,9 @@ async def edit_ip(
         except socket.gaierror:
             return RedirectResponse(f"/ips?error=Could+not+resolve+hostname:+{hostname}", status_code=303)
 
+    if not new_ip or not new_ip.strip():
+        return RedirectResponse(f"/ips?error=A+valid+IP+address+is+required", status_code=303)
+
     for entry in ips:
         if entry["ip"] == ip:
             entry["ip"]             = new_ip
@@ -159,13 +167,20 @@ async def edit_ip(
 
 
 @router.post("/delete")
-async def delete_ip(ip: str = Form(...)):
+async def delete_ip(ip: str = Form(None)):
+    if not ip or ip == "None" or ip == "null":
+        # Special case: Clean up all corrupted entries if IP is None/null
+        data = _read_ips()
+        data["ips"] = [x for x in data.get("ips", []) if x.get("ip")]
+        _write_ips(data)
+        return RedirectResponse(f"/ips?msg=Corrupted+entries+cleaned", status_code=303)
+
     active = _get_active_ip()
     if ip == active:
         return RedirectResponse(f"/ips?error=Cannot+delete+active+IP+{ip}", status_code=303)
 
     data = _read_ips()
-    data["ips"] = [x for x in data.get("ips", []) if x["ip"] != ip]
+    data["ips"] = [x for x in data.get("ips", []) if x.get("ip") != ip]
     _write_ips(data)
     return RedirectResponse(f"/ips?msg=IP+{ip}+deleted", status_code=303)
 
