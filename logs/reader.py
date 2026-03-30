@@ -27,8 +27,8 @@ RE_SMTP = re.compile(
 
 RE_REJECT = re.compile(
     r"(?P<month>\w+)\s+(?P<day>\d+)\s+(?P<time>\d+:\d+:\d+)"
-    r".*?postfix/([^/]+/)?smtpd\[\d+\]:\s+NOQUEUE: reject:.*?"
-    r"(?P<reason>[^;:]+).*?"
+    r".*?postfix/([^/]+/)?smtpd\[\d+\]:\s+NOQUEUE: (?:reject|milter-reject):.*?"
+    r"(?:RCPT from [^:]+|END-OF-MESSAGE from [^:]+)?:\s*(?P<reason>[^;]+).*?"
     r"from=<(?P<from>[^>]+)>\s+to=<(?P<to>[^>]+)>"
 )
 
@@ -106,6 +106,9 @@ def parse_maillog(limit: int = 500) -> None:
     """
     state = _read_state()
     if "qid_map" not in state: state["qid_map"] = {}
+    
+    # Priority 0: Đọc trực tiếp Log của riêng Rspamd để rút điểm Score
+    _parse_rspamd_log(state)
     
     # Priority 1: Journalctl (Incremental using Cursor)
     _parse_journal_incremental(state)
@@ -235,6 +238,41 @@ def _parse_journal_incremental(state: dict) -> None:
             
     except Exception as e:
         print(f"[LogReader] Journal incremental error: {e}")
+
+RE_RSPAMD_LOG = re.compile(
+    r"qid: <(?P<qid>[^>]+)>.*?\(.*?: \w \((?P<score>[\d\.-]+)\/[\d\.-]+\)\s*\[(?P<symbols>[^\]]*)\]"
+)
+
+def _parse_rspamd_log(state: dict) -> None:
+    rspamd_log = "/var/log/rspamd/rspamd.log"
+    if not os.path.exists(rspamd_log):
+        return
+        
+    if "rspamd_offset" not in state: state["rspamd_offset"] = 0
+    offset = state["rspamd_offset"]
+    
+    file_size = os.path.getsize(rspamd_log)
+    if file_size < offset: offset = 0
+    if offset == 0 and file_size > 1 * 1024 * 1024:
+        offset = file_size - (1 * 1024 * 1024)
+        
+    new_offset = offset
+    try:
+        with open(rspamd_log, "r", errors="replace") as f:
+            f.seek(offset)
+            for line in f:
+                new_offset = f.tell()
+                if "rspamd_task_write_log" in line:
+                    m = RE_RSPAMD_LOG.search(line)
+                    if m:
+                        qid = m.group("qid")
+                        if qid not in state["qid_map"]: state["qid_map"][qid] = {}
+                        if isinstance(state["qid_map"][qid], str): state["qid_map"][qid] = {"from": state["qid_map"][qid]}
+                        state["qid_map"][qid]["spam_score"] = float(m.group("score"))
+                        state["qid_map"][qid]["spam_symbols"] = m.group("symbols").strip()
+        state["rspamd_offset"] = new_offset
+    except Exception as e:
+        pass
 
 def _parse_files(target_logs: list, limit_per_file: int, state: dict) -> None:
     if "offsets" not in state: state["offsets"] = {}
