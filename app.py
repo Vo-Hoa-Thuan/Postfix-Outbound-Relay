@@ -176,13 +176,6 @@ async def _background_tasks():
             
         await asyncio.sleep(5)
 
-
-    print("[RelayPanel] Startup complete - all config files verified.")
-    loop = asyncio.get_event_loop()
-    loop.create_task(_background_tasks())
-
-
-
 # ── Run directly ──────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
