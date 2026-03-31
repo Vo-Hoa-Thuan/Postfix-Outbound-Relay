@@ -7,6 +7,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from typing import Optional
 
+from core.auth import do_auth
+from core.users import get_users, add_user, delete_user
 from core.settings import get_settings, save_settings, send_alert
 
 BASE_DIR  = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -21,12 +23,14 @@ async def view_settings(request: Request, msg: str = "", error: str = ""):
     postfix_limits = get_postfix_limits()
     postfix_identity = get_postfix_identity()
     mynetworks = get_mynetworks()
+    users = get_users()
     return templates.TemplateResponse("settings.html", {
         "request": request,
         "settings": settings,
         "postfix_limits": postfix_limits,
         "postfix_identity": postfix_identity,
         "mynetworks": mynetworks,
+        "users": users,
         "msg": msg,
         "error": error
     })
@@ -101,3 +105,17 @@ async def test_email_post(request: Request):
         return RedirectResponse("/settings?msg=Test+email+sent+successfully", status_code=303)
     else:
         return RedirectResponse("/settings?error=Failed+to+send+test+email+(Check+settings+or+logs)", status_code=303)
+
+@router.post("/users/add")
+async def api_add_user(username: str = Form(...), password: str = Form(...)):
+    success = add_user(username, password)
+    if success:
+        return RedirectResponse("/settings?msg=User+added+successfully", status_code=303)
+    return RedirectResponse("/settings?error=User+exists+or+invalid+data", status_code=303)
+
+@router.post("/users/delete")
+async def api_delete_user(username: str = Form(...)):
+    success = delete_user(username)
+    if success:
+        return RedirectResponse("/settings?msg=User+deleted+successfully", status_code=303)
+    return RedirectResponse("/settings?error=Cannot+delete+the+last+admin+user", status_code=303)

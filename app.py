@@ -8,6 +8,7 @@ import os
 import sys
 import time
 import asyncio
+from contextlib import asynccontextmanager
 
 # BẢN VÁ CHO PYTHON 3.6 TRÊN CENTOS CŨ CỦA NGƯỜI DÙNG:
 if sys.version_info < (3, 7):
@@ -35,12 +36,72 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE_DIR)
 
 # ── App init ──────────────────────────────────────────────────────────────────
+# ── Lifecycle Logic ───────────────────────────────────────────────────────────
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # ── Startup: ensure default config & runtime files exist ─────────────────────
+    from core.fileio import ensure_json, read_json
+    from core.users import hash_password, get_users, save_users
+
+    admin_path = os.path.join(BASE_DIR, "config", "admin.json")
+    users_path = os.path.join(BASE_DIR, "config", "users.json")
+
+    defaults = {
+        os.path.join(BASE_DIR, "config", "relay_ips.json"):  {"ips": []},
+        os.path.join(BASE_DIR, "config", "rotation.json"):   {"rotation_seconds": 60, "mode": "weighted"},
+        os.path.join(BASE_DIR, "config", "rspamd.json"): {
+            "enable": True, "required_score": 6.0, "greylist": True,
+            "rate_limit": {"enable": True, "burst": 100, "rate": "50 / 1min"},
+            "whitelist_ips": [], "blacklist_domains": []
+        },
+        os.path.join(BASE_DIR, "config", "limits.json"):     {},
+        os.path.join(BASE_DIR, "config", "users.json"):      {"users": {}},
+        os.path.join(BASE_DIR, "runtime", "ip_state.json"):  {"active_ip": None, "last_rotated": 0},
+        os.path.join(BASE_DIR, "runtime", "counters.json"):  {},
+    }
+
+    for path, default in defaults.items():
+        ensure_json(path, default)
+
+    # Migration logic: Move from admin.json to users.json if users.json is empty
+    current_users = get_users()
+    if not current_users:
+        if os.path.exists(admin_path):
+            admin_cfg = read_json(admin_path, {})
+            uname = admin_cfg.get("username", "admin")
+            phash = admin_cfg.get("password_hash")
+            if not phash and "password" in admin_cfg:
+                phash = hash_password(admin_cfg["password"])
+            
+            if phash:
+                save_users({uname: {"password_hash": phash, "role": "admin"}})
+                print(f"[RelayPanel] Migrated user '{uname}' to new multi-user system.")
+        else:
+            save_users({"admin": {"password_hash": hash_password("sieutocviet"), "role": "admin"}})
+
+    # Ensure logs/parsed.log exists
+    parsed_log = os.path.join(BASE_DIR, "logs", "parsed.log")
+    rotation_log = os.path.join(BASE_DIR, "logs", "rotation.log")
+    for log_path in [parsed_log, rotation_log]:
+        if not os.path.exists(log_path):
+            os.makedirs(os.path.dirname(log_path), exist_ok=True)
+            open(log_path, "w").close()
+
+    print("[RelayPanel] Startup complete - all config files verified.")
+    loop = asyncio.get_event_loop()
+    loop.create_task(_background_tasks())
+    
+    yield
+    print("[RelayPanel] Shutting down...")
+
+# ── App init ──────────────────────────────────────────────────────────────────
 app = FastAPI(
     title="Postfix Relay Panel",
     description="Outbound SMTP relay management UI",
     version="1.0.0",
     docs_url=None,   # hide Swagger in production
     redoc_url=None,
+    lifespan=lifespan
 )
 
 # ── Static files ──────────────────────────────────────────────────────────────
@@ -67,8 +128,8 @@ app.include_router(rspamd_router, dependencies=auth_dep)
 app.include_router(settings_router, dependencies=auth_dep)
 app.include_router(diagnostics_router, dependencies=auth_dep)
 
-
-import asyncio
+from web.routes.export import router as export_router
+app.include_router(export_router, dependencies=auth_dep)
 
 async def _background_tasks():
     from core.rotation import rotate_if_needed
@@ -112,50 +173,6 @@ async def _background_tasks():
             
         await asyncio.sleep(5)
 
-
-# ── Startup: ensure default config & runtime files exist ─────────────────────
-@app.on_event("startup")
-async def _init_defaults():
-    from core.fileio import ensure_json
-
-    from core.auth import hash_password
-
-    defaults = {
-        os.path.join(BASE_DIR, "config", "relay_ips.json"):  {"ips": []},
-        os.path.join(BASE_DIR, "config", "rotation.json"):   {"rotation_seconds": 60, "mode": "weighted"},
-        os.path.join(BASE_DIR, "config", "rspamd.json"): {
-            "enable": True, "required_score": 6.0, "greylist": True,
-            "rate_limit": {"enable": True, "burst": 100, "rate": "50 / 1min"},
-            "whitelist_ips": [], "blacklist_domains": []
-        },
-        os.path.join(BASE_DIR, "config", "limits.json"):     {},
-        os.path.join(BASE_DIR, "config", "admin.json"):      {"username": "admin", "password_hash": hash_password("sieutocviet")},
-        os.path.join(BASE_DIR, "runtime", "ip_state.json"):  {"active_ip": None, "last_rotated": 0},
-        os.path.join(BASE_DIR, "runtime", "counters.json"):  {},
-    }
-
-    for path, default in defaults.items():
-        ensure_json(path, default)
-
-    # Lọc migration cho admin.json từ plaintext lên Hash
-    admin_path = os.path.join(BASE_DIR, "config", "admin.json")
-    from core.fileio import read_json, write_json
-    admin_cfg = read_json(admin_path, {})
-    if "password" in admin_cfg:
-        pw = admin_cfg.pop("password")
-        if "password_hash" not in admin_cfg:
-            # Nếu người dùng đã cài pass cũ, giữ pass đó nhưng mã hoá. Chỗ này sẽ chuyển mật khẩu cũ thành mã hoá.
-            # Nhờ user yêu cầu đổi pass thành sieutocviet, ta ưu tiên ghi đè:
-            admin_cfg["password_hash"] = hash_password("sieutocviet")
-        write_json(admin_path, admin_cfg)
-
-    # Ensure logs/parsed.log exists
-    parsed_log = os.path.join(BASE_DIR, "logs", "parsed.log")
-    rotation_log = os.path.join(BASE_DIR, "logs", "rotation.log")
-    for log_path in [parsed_log, rotation_log]:
-        if not os.path.exists(log_path):
-            os.makedirs(os.path.dirname(log_path), exist_ok=True)
-            open(log_path, "w").close()
 
     print("[RelayPanel] Startup complete - all config files verified.")
     loop = asyncio.get_event_loop()

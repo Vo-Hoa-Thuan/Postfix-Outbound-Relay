@@ -133,6 +133,60 @@
     </div>
 </form>
 
+<!-- USER MANAGEMENT SECTION -->
+<div class="ops-card" style="margin-top: 2rem; border-top: 4px solid var(--yellow);">
+    <div class="ops-card-header">
+        <h3 class="ops-card-title">👥 User Management</h3>
+    </div>
+    <div class="ops-card-body">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+            <!-- Current Users List -->
+            <div>
+                <h4 class="small bold uppercase text-muted mb-3">Authorized Personnel</h4>
+                <table class="ip-table-premium" style="width: 100%; border-spacing: 0 0.2rem;">
+                    <thead>
+                        <tr style="background: transparent;">
+                            <th class="small text-muted">Username</th>
+                            <th class="small text-muted">Role</th>
+                            <th class="small text-muted text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for uname, info in users.items() %}
+                        <tr style="background: rgba(255,255,255,0.02);">
+                            <td class="bold">{{ uname }}</td>
+                            <td><span class="badge badge-blue small">{{ info.role | upper }}</span></td>
+                            <td class="text-right">
+                                <form action="/settings/users/delete" method="post" onsubmit="return confirm('Delete this user?')">
+                                    <input type="hidden" name="username" value="{{ uname }}">
+                                    <button type="submit" class="btn btn-secondary btn-xs text-danger">✕</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Add User Form -->
+            <div style="border-left: 1px solid var(--border); padding-left: 2rem;">
+                <h4 class="small bold uppercase text-muted mb-3">Provision New Access</h4>
+                <form action="/settings/users/add" method="post" style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div class="form-group">
+                        <label>Login Username</label>
+                        <input type="text" name="username" class="form-input" placeholder="e.g. jdoe" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Secure Password</label>
+                        <input type="password" name="password" class="form-input" required>
+                    </div>
+                    <button type="submit" class="btn btn-secondary btn-full">🚀 Add User</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="ops-card" style="margin-top: 2rem; background: var(--bg-hover);">
     <div class="ops-card-header">
         <h3 class="ops-card-title" data-i18n="ttl_maint_verif">Maintenance & Verification</h3>

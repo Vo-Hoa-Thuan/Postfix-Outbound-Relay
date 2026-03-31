@@ -34,21 +34,30 @@ def verify_password(stored_password: str, provided_password: str) -> bool:
     pwdhash = binascii.hexlify(pwdhash).decode('ascii')
     return pwdhash == stored_hash
 
-def _get_valid_token() -> str:
-    cfg = read_json(ADMIN_FILE, {"username": "admin", "password_hash": "empty"})
+def _get_user_session_token(username: str, pwd_hash: str) -> str:
+    """Tạo token phiên dựa trên username, password hash và ngày hiện tại."""
     today = time.strftime("%Y-%m-%d")
-    raw = f"{cfg.get('username', 'admin')}:{cfg.get('password_hash', 'empty')}:{today}"
+    raw = f"{username}:{pwd_hash}:{today}"
     return hashlib.sha256(raw.encode()).hexdigest()
 
 def do_auth(request: Request):
     """
-    Kéo session từ cookie. 
-    Nếu không có, trả về Redirect cho màn hình Web UI, hoặc 401 cho API.
+    Xác thực phiên của bất kỳ tài khoản người dùng nào hiện có.
     """
+    from core.users import get_users
     session = request.cookies.get("session_token")
-    if not session or session != _get_valid_token():
+    if not session:
         if request.url.path.startswith("/api/"):
             raise HTTPException(status_code=401, detail="Not authenticated")
         raise HTTPException(status_code=303, headers={"Location": "/login"})
     
-    return "admin"
+    # Kiểm tra session có khớp với bất kỳ người dùng nào không
+    users = get_users()
+    for username, info in users.items():
+        if session == _get_user_session_token(username, info.get("password_hash", "")):
+            return username
+            
+    # Nếu không khớp ai
+    if request.url.path.startswith("/api/"):
+        raise HTTPException(status_code=401, detail="Invalid session")
+    raise HTTPException(status_code=303, headers={"Location": "/login"})

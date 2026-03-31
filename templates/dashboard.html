@@ -80,22 +80,22 @@
 
 <!-- ── Main Area: Activity Feed ────────────────────────── -->
 <div class="ops-card mt-3 mb-0" style="border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-    <div class="ops-card-header" style="padding: 0.5rem 1rem; background: var(--bg-elevated); border-bottom: 2px solid var(--border);">
+    <div class="ops-card-header" style="padding: 0.5rem 1rem; background: var(--bg-elevated); border-bottom: 2px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
         <h3 class="ops-card-title" style="font-size: 0.95rem; text-transform: uppercase;"><span>📡 Activity Feed</span></h3>
-        <div style="display: flex; gap: 0.5rem; align-items: center;">
-            <div class="filter-group" style="display: flex; gap: 1rem; align-items: center;">
-                <div style="display: flex; gap: 0.3rem; align-items: center;">
+        <div style="display: flex; gap: 1rem; align-items: center;">
+            <div class="filter-group" style="display: flex; gap: 1.2rem; align-items: center;">
+                <div style="display: flex; gap: 0.4rem; align-items: center;">
                     <span style="font-size: 0.75rem; font-weight: bold; color: var(--text-muted);">LOG</span>
-                    <select id="filter-date-top" class="form-input btn-xs" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; height: auto; outline: none; border-radius: 3px; border: 1px solid var(--border); background: var(--bg-base); color: var(--text-primary); min-width: 120px;" onchange="refreshLogs()">
+                    <select id="filter-date-top" class="form-input btn-xs" style="padding: 0.2rem 0.6rem; font-size: 0.75rem; height: 30px; border-radius: 4px; background: var(--bg-surface); min-width: 120px;" onchange="refreshLogs()">
                         <option value="" data-i18n="opt_all_days">-- TẤT CẢ NGÀY --</option>
                         {% for udate in unique_dates %}
                         <option value="{{ udate }}">{{ udate }}</option>
                         {% endfor %}
                     </select>
                 </div>
-                <div style="display: flex; gap: 0.3rem; align-items: center;">
+                <div style="display: flex; gap: 0.4rem; align-items: center;">
                     <span style="font-size: 0.75rem; font-weight: bold; color: var(--text-muted);">IP</span>
-                    <select id="filter-ip-top" class="form-input btn-xs" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; height: auto; outline: none; border-radius: 3px; border: 1px solid var(--border); background: var(--bg-base); color: var(--text-primary); min-width: 120px;" onchange="refreshLogs()">
+                    <select id="filter-ip-top" class="form-input btn-xs" style="padding: 0.2rem 0.6rem; font-size: 0.75rem; height: 30px; border-radius: 4px; background: var(--bg-surface); min-width: 120px;" onchange="refreshLogs()">
                         <option value="" data-i18n="opt_all_ips">-- TẤT CẢ IP --</option>
                         {% for uip in unique_ips %}
                         <option value="{{ uip }}">{{ uip }}</option>
@@ -103,7 +103,12 @@
                     </select>
                 </div>
             </div>
-            <button onclick="refreshLogs()" class="btn btn-secondary btn-xs" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; height: auto;" data-i18n="btn_refresh">↻ Cập nhật</button>
+            <div style="display: flex; gap: 0.4rem; align-items: center;">
+                <button onclick="refreshLogs()" class="btn btn-secondary btn-xs" style="padding: 0.2rem 0.6rem; font-size: 0.75rem; height: 28px; border-radius: 4px;" data-i18n="btn_refresh">↻ Làm mới</button>
+                <a href="/api/export/csv" class="btn btn-primary btn-xs" style="padding: 0 0.6rem; font-size: 0.75rem; height: 28px; background: #10b981; border: none; color: white; text-decoration: none; display: flex; align-items: center; gap: 0.3rem; line-height: 28px; border-radius: 4px;" download>
+                    📊 <span data-i18n="btn_export_excel">Xuất Excel</span>
+                </a>
+            </div>
         </div>
     </div>
     <div class="ops-card-body" style="padding: 0; height: 60vh; overflow-y: auto;">
