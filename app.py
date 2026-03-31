@@ -8,7 +8,8 @@ import os
 import sys
 import time
 import asyncio
-from contextlib import asynccontextmanager
+
+
 
 # BẢN VÁ CHO PYTHON 3.6 TRÊN CENTOS CŨ CỦA NGƯỜI DÙNG:
 if sys.version_info < (3, 7):
@@ -35,10 +36,18 @@ from fastapi.responses import RedirectResponse
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE_DIR)
 
+
 # ── App init ──────────────────────────────────────────────────────────────────
-# ── Lifecycle Logic ───────────────────────────────────────────────────────────
-@asynccontextmanager
-async def lifespan(app: FastAPI):
+app = FastAPI(
+    title="Postfix Relay Panel",
+    description="Outbound SMTP relay management UI",
+    version="1.0.0",
+    docs_url=None,   # hide Swagger in production
+    redoc_url=None
+)
+
+@app.on_event("startup")
+async def startup_event():
     # ── Startup: ensure default config & runtime files exist ─────────────────────
     from core.fileio import ensure_json, read_json
     from core.users import hash_password, get_users, save_users
@@ -90,19 +99,10 @@ async def lifespan(app: FastAPI):
     print("[RelayPanel] Startup complete - all config files verified.")
     loop = asyncio.get_event_loop()
     loop.create_task(_background_tasks())
-    
-    yield
-    print("[RelayPanel] Shutting down...")
 
-# ── App init ──────────────────────────────────────────────────────────────────
-app = FastAPI(
-    title="Postfix Relay Panel",
-    description="Outbound SMTP relay management UI",
-    version="1.0.0",
-    docs_url=None,   # hide Swagger in production
-    redoc_url=None,
-    lifespan=lifespan
-)
+@app.on_event("shutdown")
+async def shutdown_event():
+    print("[RelayPanel] Shutting down...")
 
 # ── Static files ──────────────────────────────────────────────────────────────
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
