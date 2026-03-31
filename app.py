@@ -151,9 +151,12 @@ async def _background_tasks():
             # 1. IP Rotation (Every check, has internal logic) - Thread-safe because it writes files
             rotated, new_ip = await loop.run_in_executor(None, rotate_if_needed)
             if rotated and new_ip:
-                print(f"[RelayPanel] Auto-rotated to IP: {new_ip}")
                 # sync_transport reloads postfix, which is slow - run in executor
-                await loop.run_in_executor(None, sync_transport, new_ip)
+                ok, msg = await loop.run_in_executor(None, sync_transport, new_ip)
+                if ok:
+                    print(f"[RelayPanel] Auto-rotated to IP: {new_ip} - {msg}")
+                else:
+                    print(f"[RelayPanel] Rotation FAILED for IP: {new_ip} - {msg}")
                 
             # 2. Blacklist Check (Has internal throttling/interval) - VERY SLOW
             await loop.run_in_executor(None, auto_check_all)

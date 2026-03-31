@@ -34,10 +34,10 @@ def reload_postfix() -> Tuple[bool, str]:
 
 def sync_transport(active_ip: str) -> Tuple[bool, str]:
     """
-    If the active IP has smtp_user/smtp_pass: Configure Postfix to use it as a Smarthost relay 
-    with SASL authentication.
-    Otherwise: Set smtp_bind_address so outbound connections originate from active_ip locally.
+    If the active IP has smtp_user/smtp_pass: Configure Postfix as Smarthost.
+    Otherwise: Set smtp_bind_address locally.
     """
+    from core.rotation import log_rotation_event
     if not active_ip:
         return False, "No active IP provided."
 
@@ -74,7 +74,9 @@ def sync_transport(active_ip: str) -> Tuple[bool, str]:
             # --- Local Bind Mode ---
             from core.system_safe import is_ip_local
             if not is_ip_local(active_ip):
-                return False, f"IP {active_ip} is NOT assigned to this VPS. Binding failed for safety."
+                msg = f"IP {active_ip} is NOT assigned to this VPS. Binding failed for safety."
+                log_rotation_event(None, active_ip, f"ERROR: {msg}")
+                return False, msg
 
             _run(f"postconf -e 'smtp_bind_address={active_ip}'")
             _run("postconf -e 'relayhost='") # clear smarthost
@@ -88,10 +90,14 @@ def sync_transport(active_ip: str) -> Tuple[bool, str]:
         # Reload Postfix to apply
         ok2, out2 = _run("postfix reload")
         if not ok2:
-            return False, f"Postfix reload failed: {out2}"
+            msg = f"Postfix reload failed: {out2}"
+            log_rotation_event(None, active_ip, f"ERROR: {msg}")
+            return False, msg
 
+        log_rotation_event(None, active_ip, f"SUCCESS: {msg}")
         return True, msg
     except Exception as e:
+        log_rotation_event(None, active_ip, f"CRITICAL: {str(e)}")
         return False, str(e)
 
 

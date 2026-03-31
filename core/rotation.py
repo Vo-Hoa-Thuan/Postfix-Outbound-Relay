@@ -35,13 +35,13 @@ def should_rotate() -> bool:
     return get_time_remaining() == 0
 
 
-def log_rotation_event(old_ip: Optional[str], new_ip: str, reason: str = "scheduled"):
+def log_rotation_event(old_ip: Optional[str], new_ip: str, status: str = "scheduled"):
     """Appends a rotation event to logs/rotation.log."""
     event = {
         "time": time.strftime("%Y-%m-%d %H:%M:%S"),
         "old_ip": old_ip or "none",
         "new_ip": new_ip,
-        "reason": reason
+        "status": status
     }
     try:
         os.makedirs(os.path.dirname(ROTATION_LOG), exist_ok=True)
