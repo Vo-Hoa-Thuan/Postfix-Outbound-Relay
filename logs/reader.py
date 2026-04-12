@@ -384,9 +384,14 @@ def _parse_line(line: str, qid_map: Dict[str, str]) -> Optional[dict]:
         
         relay_str = s_dict.get("relay") or ""
         dest_ip = ""
-        if relay_str:
+        if relay_str and relay_str != "none":
             rip_m = RE_RELAY_IP.search(f"relay={relay_str}")
             if rip_m: dest_ip = rip_m.group("ip")
+            
+        if not dest_ip and resp:
+            import re
+            m_ip = re.search(r"\[(\d+\.\d+\.\d+\.\d+)\]", resp)
+            if m_ip: dest_ip = m_ip.group(1)
             
         entry = {
             "time": time_str,
@@ -397,7 +402,7 @@ def _parse_line(line: str, qid_map: Dict[str, str]) -> Optional[dict]:
             "subject": subj,
             "status": status,
             "response": resp,
-            "local_ip": client, # Sử dụng Client IP thay thế cho Local Interface
+            "local_ip": client if client else ("127.0.0.1 (Local)" if caller_from else ""),
             "dest_ip": dest_ip,
             "client_ip": client,
             "sasl": sasl,
