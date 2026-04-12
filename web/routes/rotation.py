@@ -36,6 +36,8 @@ async def save_rotation(
 async def trigger_rotation(request: Request):
     """Manually force an IP rotation now."""
     from core.rotation import get_time_remaining, log_rotation_event
+    from core.relay import get_active_ip, select_next_ip
+    from core.postfix import sync_transport
     
     current_cfg = get_active_ip()
     current_ip  = current_cfg["ip"] if current_cfg else None

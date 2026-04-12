@@ -74,9 +74,9 @@ def sync_transport(active_ip: str) -> Tuple[bool, str]:
             # --- Local Bind Mode ---
             from core.system_safe import is_ip_local
             if not is_ip_local(active_ip):
-                msg = f"IP {active_ip} is NOT assigned to this VPS. Binding failed for safety."
-                log_rotation_event(None, active_ip, f"ERROR: {msg}")
-                return False, msg
+                msg = f"WARNING: IP {active_ip} is NOT explicitly assigned to this VPS. Binding anyway..."
+                log_rotation_event(None, active_ip, f"WARNING: {msg}")
+                # We do not return False here. We allow Postfix to attempt binding.
 
             _run(f"postconf -e 'smtp_bind_address={active_ip}'")
             _run("postconf -e 'relayhost='") # clear smarthost
